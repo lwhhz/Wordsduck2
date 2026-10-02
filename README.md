@@ -1,10 +1,15 @@
 # Wordsduck2
 
+[![最新版本](https://img.shields.io/github/v/release/lwhhz/Wordsduck2?label=release)](../../releases/latest)
+
 一个**完全离线**的背单词工具：把 Excel / CSV 词表导进来，按遗忘权重抽词来背。
 一份网页代码，两种用法 —— 浏览器直接打开，或者装成安卓 App。
 
 没有账号、没有服务器、没有网络请求。词书、进度、复习本、学习统计全部存在本机
 （`localStorage`），所以断网能用，也不会有人看到你在背什么。
+
+> **想直接装？** 去 [Releases](../../releases/latest) 下载 APK
+> （1.57 MB，Android 10 及以上，无需任何权限）。
 
 ---
 
@@ -43,7 +48,12 @@ cd android
 # 产物：app/build/outputs/apk/release/app-release.apk
 ```
 
-已经构建好的成品见 [Releases](../../releases)。
+已经构建好的成品见 [Releases](../../releases/latest)
+（`Wordsduck2-1.0.0-release.apk`，1.57 MB，Android 10 及以上）。
+
+> ⚠️ 这个包的签名用的是 **Android 的 debug 密钥**，仅供自用与测试：
+> 密码是公开的，而且换一台构建机会生成新密钥、导致无法覆盖安装。
+> 要对外分发请先按 [`android/BUILD-ANDROID.md`](android/BUILD-ANDROID.md) 第四节换成自己的 keystore。
 
 装了 APK 之后有几处会走原生能力（网页版没有）：
 
