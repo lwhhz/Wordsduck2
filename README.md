@@ -10,6 +10,14 @@
 
 ## 它长什么样
 
+| 主页 | 背词 · 提问 | 背词 · 揭示 |
+|---|---|---|
+| ![主页](docs/screenshots/01-home.png) | ![提问](docs/screenshots/02-study-ask.png) | ![揭示](docs/screenshots/03-study-revealed.png) |
+
+| 统计 | 热力图与趋势 | 深色模式 |
+|---|---|---|
+| ![统计](docs/screenshots/04-stats.png) | ![热力图](docs/screenshots/05-heatmap.png) | ![深色](docs/screenshots/06-home-dark.png) |
+
 - **主页**：问候语 + 随机背景词 + 拖拽导入 Excel 区 + 词书库
 - **背词页**：一屏一卡，中文意思 → 想起来 → 揭示英文、词性、发音、例句
 - **统计页**：连续天数 / 热力图 / 趋势 / 掌握度 / 数据备份
@@ -71,8 +79,12 @@ android/
     TtsBridge.kt        页面 ↔ 系统 TTS 的桥（也寄放 setDarkMode / saveFile）
     CropActivity.kt     自实现的 1:1 头像裁剪
 tools/                  开发期用的一次性脚本（CDP 验证、图标生成）
+docs/screenshots/       README 里的界面截图
 logo.png                源图，图标都从它生成
 ```
+
+> 截图里的词书是**临时造的示例数据**（`capacity` / `significant` / `ambiguous`…），
+> 不是谁的真实学习记录。
 
 ## 数据放在哪
 
