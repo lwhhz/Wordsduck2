@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式下的同一层底色。
+         为什么必须有这一份：边到边之后，窗口背景会从状态栏 / 导航栏那圈留白里
+         露出来（见 MainActivity.applySystemBarInsets）。网页自己是用
+         prefers-color-scheme 切深浅两套的（assets/style.css 里 md-surface 这个
+         CSS 变量在深色下是 #111318），窗口背景如果死守浅色 #FDFBFF，深色模式下
+         就会在顶部和底部露出两条刺眼的白边。
+         主题是 DayNight，系统切深色时这份 values-night 会自动生效，取的是与
+         网页深色 surface 相同的 #111318。
+
+         注意：XML 注释里不能出现连续两个减号（连字符），否则 aapt2 会直接报错。
+         写 CSS 变量名时不要带前面的两个减号。 -->
+    <color name="wordsduck_bg">#111318</color>
+</resources>

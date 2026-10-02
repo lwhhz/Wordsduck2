@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WebView 应用用不到 ActionBar，主题直接从 AppCompat 的 NoActionBar 派生 -->
+    <style name="Theme.Wordsduck" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/wordsduck_bg</item>
+        <!-- 两条系统栏颜色只在 Android 15 以下、且系统栏可见时才有意义。
+             本应用的做法是把状态栏和手势线整个隐藏（MainActivity 的
+             enterImmersiveMode()），所以这两条实际上看不到效果；
+             保留只是为了兼容旧系统，不要指望它们来留白 —— 留白靠
+             keepContentClearOfSystemAreas() 给 WebView 加的内边距。 -->
+        <item name="android:statusBarColor">@color/wordsduck_bg</item>
+        <item name="android:navigationBarColor">@color/wordsduck_bg</item>
+        <!-- 状态栏和手势线在 MainActivity.enterImmersiveMode() 里隐藏，做成全屏。
+             这里先声明挖孔布局模式，是为了「最开始那一帧」就对：
+             只在代码里设的话，窗口会先按安全区内缩画一帧、再铺满整屏，启动时能
+             看到一次跳动。shortEdges 表示内容可以铺到挖孔两侧，文字不会被摄像头
+             挖孔压住 —— 顶部另有按 insets 留的内边距（见 keepContentClearOfSystemAreas）。 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+
+    <!-- 裁剪界面：底色固定深色（见 CropActivity，四周压暗中间留亮是裁剪界面的
+         通行做法，浅色主题下也这么用），所以这里显式声明 statusBarColor /
+         navigationBarColor 也用同一个深色，避免状态栏那一圈闪出浅色。
+         状态栏图标用浅色（windowLightStatusBar=false，深底上看得清）。 -->
+    <style name="Theme.Wordsduck.Crop" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/wordsduck_crop_bg</item>
+        <item name="android:statusBarColor">@color/wordsduck_crop_bg</item>
+        <item name="android:navigationBarColor">@color/wordsduck_crop_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

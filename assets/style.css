@@ -1,0 +1,3939 @@
+/* ============================================================
+   单词卡 · 样式表
+   视觉方向：Material Design 3（Material You）
+   ------------------------------------------------------------
+   结构：
+     1. 设计令牌   —— 色彩 / 字形 / 形状 / 高度 / 动效 / 状态层
+     2. 基础与画布
+     3. 通用组件   —— 按钮 / 图标按钮 / 文本按钮 / 纸片 / 输入 / 开关 / 勾选
+     4. 逐屏样式   —— 词书库 / 背词 / 成绩单 / 学习统计
+     5. 弹层与提示
+     6. 响应式与无障碍
+
+   两条硬约束（重写时逐条核对过）：
+     · assets/app.js 一行未改。它用到的 90 个类名与本文件里的每个 id
+       都保留原样，只是换了观感。
+     · 纸张 / 铅字 / 印章那套隐喻整体退役，换成 M3 的
+       色调面（tonal surface）、形状标度与状态层。
+   ============================================================ */
+
+/* ============================================================
+   1. 设计令牌
+   ============================================================ */
+
+:root {
+  /* 声明本页受支持的两套配色：这让浏览器把表单控件、滚动条、
+     以及 <input type=date> 这类原生部件也一并切到对应主题；
+     同时明确告诉 Chromium「这是精心设计过的浅色页面」，
+     避免它自作主张做强制反色（auto dark）。 */
+  color-scheme: light dark;
+
+  /* ---- 1.1 色彩：M3 完整令牌集 ----
+     参考色（seed）取自 Google Blue #0B57D0，也就是 Google 自家
+     产品当前的主色。每个角色都配一个 on- 前景色，
+     以及 container / on-container 这一对用于「色调面」。 */
+  --md-primary: #0b57d0;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #d3e3fd;
+  --md-on-primary-container: #041e49;
+  --md-primary-fixed: #d3e3fd;
+  --md-primary-fixed-dim: #a8c7fa;
+  --md-on-primary-fixed: #041e49;
+  --md-on-primary-fixed-variant: #0842a0;
+
+  --md-secondary: #565f71;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #dae2f9;
+  --md-on-secondary-container: #131c2b;
+
+  /* tertiary 一族：与 primary 同源派生（M3 的 tertiary 本来就是「邻近色相」）。
+     这里让 tertiary-container 从 --md-surface-tint 兑出来，
+     于是它也随主题走 —— 底色用中性灰、只把色相染进去，
+     这样 --md-on-tertiary-container 那对深色文字仍然成立。
+     （早先它是个写死的 #c2e7ff，6 个主题都不覆盖，
+     结果词书库横幅的渐变右半边永远是 Google 蓝。） */
+  --md-tertiary: #00639b;
+  --md-on-tertiary: #ffffff;
+  --md-tertiary-container: color-mix(in srgb, var(--md-surface-tint) 22%, #d7dbe6);
+  --md-on-tertiary-container: #001d33;
+
+  --md-error: #b3261e;
+  --md-on-error: #ffffff;
+  --md-error-container: #f9dedc;
+  --md-on-error-container: #410e0b;
+
+  --md-success: #146c2e;
+  --md-on-success: #ffffff;
+  --md-success-container: #c4eed0;
+  --md-on-success-container: #072711;
+
+  --md-warning: #7a5900;
+  --md-warning-container: #ffdf99;
+  --md-on-warning-container: #261a00;
+
+  --md-surface: #fdfbff;
+  /* surface-dim 是「比 surface 略暗」的那一档，用于需要退到后面的整块区域。
+     这里也让它带上色相，否则换了主题它还是那块中性灰。 */
+  --md-surface-dim: color-mix(in srgb, var(--md-surface-tint) 10%, #dde3ea);
+  --md-surface-bright: #fdfbff;
+  --md-on-surface: #1a1c1e;
+  --md-on-surface-variant: #44474e;
+
+  /* ---- 1.1b 色调面（tonal surface）：让「主题色」真的铺到整个界面 ----
+     问题：只换 --md-primary 时，主题色只出现在按钮、进度条、选中项这些
+     小面积元素上，整页底色仍是中性灰白 —— 这就是「主题色给人的感觉不明显」。
+
+     M3 的做法不是把主色涂到大块面上（那会让文字对比度崩掉），
+     而是**把主色混进中性面**：surface-tint 以极低比例叠在 surface 上，
+     得到一族「带本主题色相、但明度仍按层级排开」的中性面。
+     M3 文档里这条叫 tonal elevation —— surface 容器五档对应的
+     surface-tint 不透明度依次是 0 / 5 / 8 / 11 / 12%。
+
+     实现：染色输入取 --md-primary 本身（--md-surface-tint 就是它的别名），
+     各档面用 color-mix 从 --md-surface 兑出来。
+     这样做的关键收益是「一处生效」：6 个主题 × 浅/深 = 12 套配色
+     全都只覆盖了 --md-primary 一族，色调面会自动跟着换色，
+     不需要为每套再补 6 个 surface 值（那会多出 72 个要同步维护的颜色）。
+
+     color-mix 的支持面足够（Chrome 111+ / WebView 111+），
+     而本页已在 ::selection、状态层等多处依赖它。 */
+  --md-surface-tint: var(--md-primary);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: color-mix(in srgb, var(--md-surface-tint) 5%, var(--md-surface));
+  --md-surface-container: color-mix(in srgb, var(--md-surface-tint) 8%, var(--md-surface));
+  --md-surface-container-high: color-mix(in srgb, var(--md-surface-tint) 11%, var(--md-surface));
+  --md-surface-container-highest: color-mix(in srgb, var(--md-surface-tint) 12%, var(--md-surface));
+  --md-surface-variant: color-mix(in srgb, var(--md-surface-tint) 16%, var(--md-surface));
+
+  /* 轮廓线同样跟着主题走（M3 的 outline 也是从同一色相派生的）。
+     这是让「淡淡的主题色」真的看得出来最有效的一处：
+     全站几十条描边（面板、卡片、列表分组、输入框、分隔线）都会带上色相，
+     而描边只有 1px，再重也不会显得花。
+     outline 用 30%（明显一些，用于输入框和描边按钮的边界），
+     outline-variant 用 14%（只作分隔，越轻越好）。 */
+  --md-outline: color-mix(in srgb, var(--md-surface-tint) 30%, #74777f);
+  --md-outline-variant: color-mix(in srgb, var(--md-surface-tint) 14%, #c4c6d0);
+  --md-scrim: #000000;
+  --md-inverse-surface: #2f3033;
+  --md-inverse-on-surface: #f1f0f4;
+  --md-inverse-primary: #a8c7fa;
+  --md-shadow: #000000;
+
+  /* ---- 1.2 色彩：既有 class 名的角色别名 ----
+     app.js 用 class 名（is-jade / is-red / cf-tag…）表达语义，
+     这些别名把语义接到 M3 角色上，见 3.x 与 4.x 的用法。 */
+  --tone-info: var(--md-primary);
+  --tone-info-bg: var(--md-primary-container);
+  --tone-ok: var(--md-success);
+  --tone-ok-bg: var(--md-success-container);
+  --tone-bad: var(--md-error);
+  --tone-bad-bg: var(--md-error-container);
+  --tone-warn: var(--md-warning);
+
+  /* 热力图色阶：M3 的 primary 色阶由浅到深，0 级用低对比的中性面 */
+  --heat-0: var(--md-surface-container-high);
+  --heat-1: #c2e7ff;
+  --heat-2: #7fc4f5;
+  --heat-3: #2b7fd4;
+  --heat-4: #0b57d0;
+
+  /* ---- 1.3 字形 ----
+     M3 的 Google Sans / Roboto 体系。中文没有对应的 Google 字形，
+     按 M3 的 fallback 思路挂到系统无衬线（思源 / 苹方 / 微软雅黑）。
+     等宽留给键位提示，数字用 tabular 保证列对齐。
+
+     M3 把字体分成两个角色：Brand（Display / Headline，负责表现力）
+     与 Plain（Title / Body / Label，负责可读性），此处都用同一族字体，
+     所以只留一个 --md-font。 */
+  --md-font: "Google Sans", "Google Sans Text", Roboto, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Source Han Sans SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  --md-font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 字距（tracking）在这里**不能**写进 font 简写。
+     依据：Material Web 自己的类型标度（设计规范/tokens/versions/latest/
+     sass/_md-sys-typescale.scss）里，15 个样式每个都长这样 ——
+         font-family / font-size / font-weight / letter-spacing / line-height
+     字距是一条**独立属性**，简写里根本没有这一格。
+
+     而且 font 简写会把 letter-spacing 一并重置为 normal，所以「写简写 +
+     另处补 letter-spacing」的旧写法很脆：谁后用 font，谁就把字距抹掉。
+     本表的做法是：--md-* 只装字形，字距单独用 --md-track-* 配，
+     两者成对出现（见下面 .btn / .link 等处的用法）。
+
+     自测：删除某条 letter-spacing 后该处字距会归零（而不是保留），
+     说明它确实来自这条声明。 */
+  --md-display-s: 400 36px/44px var(--md-font);
+  --md-headline-m: 400 28px/36px var(--md-font);
+  --md-headline-s: 400 24px/32px var(--md-font);
+  --md-title-l: 400 22px/28px var(--md-font);
+  --md-title-m: 500 16px/24px var(--md-font);
+  --md-title-s: 500 14px/20px var(--md-font);
+  --md-body-l: 400 16px/24px var(--md-font);
+  --md-body-m: 400 14px/20px var(--md-font);
+  --md-body-s: 400 12px/16px var(--md-font);
+  --md-label-l: 500 14px/20px var(--md-font);
+  --md-label-m: 500 12px/16px var(--md-font);
+  --md-label-s: 500 11px/16px var(--md-font);
+
+  /* 逐样式的字距，值与 M3 标度逐条对应（原值以 rem 计，1rem = 16px）：
+       body-large  0.03125rem  = 0.5px
+       body-medium 0.015625rem = 0.25px
+       body-small  0.025rem    = 0.4px
+       label-large 0.00625rem  = 0.1px
+       label-medium/small 0.03125rem = 0.5px
+       title-medium 0.009375rem = 0.15px
+       title-small  0.00625rem  = 0.1px
+     Display / Headline / Title Large 的字距都是 0，不必单列。
+
+     逐条列出而不是只写用到的几条，是因为「查表对齐」本身有价值：
+     哪一处该用哪一档，对着这张表就能判断，不必回去翻规范。
+     其中 --md-track-body-l 与 --md-track-label-s 目前没有落点
+     （全站没有 Body Large 的正文块，也没有独立的 Label Small 标签），
+     留着是为了下次真用到时不必再回来补。
+     Display / Headline 两族的字距在 M3 里都是 0，所以不设 token：
+     这类元素直接不写 letter-spacing 就是对的，
+     设一个值为 0 的 token 反而会让人以为「这里有个可调的字距」。 */
+  --md-track-title-m: 0.15px;
+  --md-track-title-s: 0.1px;
+  --md-track-body-l: 0.5px;
+  --md-track-body-m: 0.25px;
+  --md-track-body-s: 0.4px;
+  --md-track-label-l: 0.1px;
+  --md-track-label-m: 0.5px;
+  --md-track-label-s: 0.5px;
+
+  /* ---- 1.4 形状标度 ----
+     数值取自 M3 的 corner 标度，括号里是官方 token 名。
+     变量名沿用旧表里的短名（--md-shape-xs…xl），值就是官方那几档，
+     所以现有样式不用改；新写的按下面的语义别名走更不容易看错。 */
+  --md-shape-none: 0;
+  --md-shape-xs: 4px;    /* corner-extra-small */
+  --md-shape-s: 8px;     /* corner-small */
+  --md-shape-m: 12px;    /* corner-medium */
+  --md-shape-l: 16px;    /* corner-large */
+  --md-shape-xl: 28px;   /* corner-extra-large */
+  --md-shape-full: 9999px; /* corner-full */
+
+  /* M3 的「增补档」：Expressive 更新加的 20 / 32 / 48，
+     分别用于导航抽屉、底部面板这类更圆的大面与全屏面。 */
+  --md-shape-l-increased: 20px;
+  --md-shape-xl-increased: 32px;
+  --md-shape-2xl: 48px;
+
+  /* 语义别名：按 M3 的组件映射直接叫出用途，
+     避免样式里出现 --md-shape-xl 这种「得回去查表」的数字名。 */
+  --md-shape-card: var(--md-shape-m);      /* 卡片 medium */
+  --md-shape-sheet: var(--md-shape-xl);    /* 对话框 / 底部面板 extra-large */
+  --md-shape-field: var(--md-shape-xs);    /* 文本域 extra-small */
+  --md-shape-chip: var(--md-shape-s);      /* 纸片 small */
+
+  /* ---- 1.5 高度标尺（M3 elevation） ---- */
+  --md-elev-0: none;
+  --md-elev-1: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px 1px rgba(0, 0, 0, .15);
+  --md-elev-2: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 6px 2px rgba(0, 0, 0, .15);
+  --md-elev-3: 0 1px 3px rgba(0, 0, 0, .3), 0 4px 8px 3px rgba(0, 0, 0, .15);
+  --md-elev-4: 0 2px 3px rgba(0, 0, 0, .3), 0 6px 10px 4px rgba(0, 0, 0, .15);
+  --md-elev-5: 0 4px 4px rgba(0, 0, 0, .3), 0 8px 12px 6px rgba(0, 0, 0, .15);
+
+  /* ---- 1.5b 头像投影 ----
+     和上面那套 elevation 分开，是因为这两个数**不跟随主题色**：
+     头像的投影以前是用 color-mix 拿 --md-primary 兑出来的，
+     换个主题（黄 / 粉 / 绿）投影就跟着变色 —— 但投影是「光被挡住」的结果，
+     本来就该是中性黑，不该带色相。
+     浅色：普通的中性阴影。
+     深色：黑色阴影在黑底上看不见，所以改成「微微发光」——
+           用一点点白色光晕把头像从背景里托出来，而不是加深阴影。 */
+  --md-avatar-shadow: 0 2px 8px -2px rgba(0, 0, 0, .28);
+  --md-avatar-glow: 0 0 0 1px rgba(255, 255, 255, .06), 0 2px 14px rgba(255, 255, 255, .10);
+
+  /* ---- 1.6 动效 ----
+     M3 的曲线分两套：**Emphasized** 用于「承担重量的位移」，
+     **Standard** 用于常规过渡。两套在不同区段取值并不相同 ——
+     只有「起止都在屏内」那条恰好都是 cubic-bezier(.2,0,0,1)，
+     进屏（decelerate）与出屏（accelerate）必须分开写：
+       Standard Decelerate   cubic-bezier(0, 0, 0, 1)
+       Standard Accelerate   cubic-bezier(0.3, 0, 1, 1)
+       Emphasized Decelerate cubic-bezier(0.05, 0.7, 0.1, 1)
+       Emphasized Accelerate cubic-bezier(0.3, 0, 0.8, 0.15)
+     早先这四条里有两条被写成了 accel 的 .3/.8/.15 ——
+     用在下拉、卡片入场这些「进屏」场景上会显得发涩。 */
+  --md-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --md-ease-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --md-ease-standard-accelerate: cubic-bezier(.3, 0, 1, 1);
+  --md-ease-emphasized: cubic-bezier(.2, 0, 0, 1);
+  --md-ease-decelerate: cubic-bezier(.05, .7, .1, 1);
+  --md-ease-accelerate: cubic-bezier(.3, 0, .8, .15);
+  --md-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+
+  /* 时长标度：短/中/长各四档，另加特长的页面级过渡。
+     这里把 M3 的整张表都声明出来，而不是只声明当前用到的三档 ——
+     缺档时人们会顺手写一个 320ms 这样的魔法数字，久了就再也对不回标度。
+     有了完整表，任何一次过渡都能先问「这属于哪一档」再取值。 */
+  --md-dur-short1: 50ms;
+  --md-dur-short2: 100ms;
+  --md-dur-short3: 150ms;
+  --md-dur-short4: 200ms;
+  --md-dur-medium1: 250ms;
+  --md-dur-medium2: 300ms;
+  --md-dur-medium3: 350ms;
+  --md-dur-medium4: 400ms;
+  --md-dur-long1: 450ms;
+  --md-dur-long2: 500ms;
+  --md-dur-long3: 550ms;
+  --md-dur-long4: 600ms;
+  --md-dur-extra-long1: 700ms;
+  --md-dur-extra-long2: 800ms;
+
+  /* 旧变量名保留：样式表里已有大量 --md-dur-short / medium / long 的引用，
+     它们分别对应 short3(150) / medium1(250) / medium4(400)，
+     也就是 M3 里最常用的那三档，语义没变，所以不逐个改名。 */
+  --md-dur-short: var(--md-dur-short3);
+  --md-dur-medium: var(--md-dur-medium1);
+  --md-dur-long: var(--md-dur-medium4);
+
+  /* ---- 1.7 状态层 ----
+     交互反馈一律靠覆盖层，不用「往下位移 2px」那套拟物手法。 */
+  --md-state-hover: .08;
+  --md-state-focus: .10;
+  --md-state-press: .10;
+  --md-state-drag: .16;
+  --md-state-disabled: .38;
+  --md-state-disabled-container: .12;
+
+  /* ---- 1.8 版式尺度 ---- */
+  --md-gutter: clamp(16px, 4vw, 24px);
+  --md-page-max: 1120px;
+  --md-shadow-card: var(--md-elev-1);
+}
+
+/* ---- 1.9 深色主题：同一套令牌整体换值 ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary: #a8c7fa;
+    --md-on-primary: #062e6f;
+    --md-primary-container: #0842a0;
+    --md-on-primary-container: #d3e3fd;
+    --md-primary-fixed: #d3e3fd;
+    --md-primary-fixed-dim: #a8c7fa;
+    --md-on-primary-fixed: #041e49;
+    --md-on-primary-fixed-variant: #0842a0;
+
+    --md-secondary: #bec6dc;
+    --md-on-secondary: #283041;
+    --md-secondary-container: #3e4759;
+    --md-on-secondary-container: #dae2f9;
+
+    /* 深色下同样从 --md-surface-tint 派生（同 1.2 的说明）。
+       关键点：on-tertiary-container 必须跟着换。
+       容器是从「深色中性灰」兑出来的，明度只比 --md-surface 高一点点，
+       比原来那个 #004a77 亮得多；再用原来的浅色 #c2e7ff 压上去会掉到约 3.8:1，
+       不到 AA。改成比容器更亮一档的 #d7e3f8（同为「容器上的浅色文字」角色），
+       实测各主题下约 9:1。改配色时这两行必须成对改 —— 单独改一个就会崩对比度。 */
+    --md-tertiary: #7fcfff;
+    --md-on-tertiary: #003353;
+    --md-tertiary-container: color-mix(in srgb, var(--md-surface-tint) 24%, #2b303b);
+    --md-on-tertiary-container: #d7e3f8;
+
+    --md-error: #f2b8b5;
+    --md-on-error: #601410;
+    --md-error-container: #8c1d18;
+    --md-on-error-container: #f9dedc;
+
+    --md-success: #b6f0bd;
+    --md-on-success: #00391a;
+    --md-success-container: #0a5227;
+    --md-on-success-container: #c4eed0;
+
+    --md-warning: #f5c518;
+    --md-warning-container: #5c4300;
+    --md-on-warning-container: #ffdf99;
+
+    --md-surface: #111318;
+    /* surface-dim 是「比 surface 略暗」的那一档。上面浅色版已经改成
+       color-mix，这里当时漏改了 —— 原值 #111318 恰好和 --md-surface 相同，
+       既没跟着主题走，也不满足它自己那条「比 surface 略暗」的说明。
+       深色下用黑色往下压，同时带上主题色相。 */
+    --md-surface-dim: color-mix(in srgb, var(--md-surface-tint) 10%, color-mix(in srgb, #000000 25%, #111318));
+    --md-surface-bright: #37393e;
+    --md-on-surface: #e2e2e9;
+    --md-on-surface-variant: #c4c6d0;
+
+    /* 深色下的色调面（同 1.1b）。
+       比例比浅色**更高**：深色底本身接近黑，同样 5% 的混色几乎看不出来，
+       直观感受会退化成「还是灰的」。M3 深色也确实是靠更大的叠加比例
+       把层级和色相一起做出来。
+       明度方向不变 —— 深色下依然是「层级越高、面越亮」，
+       所以最低档比 --md-surface 更暗，高档比它更亮。 */
+    --md-surface-tint: var(--md-primary);
+    --md-surface-container-lowest: color-mix(in srgb, #000000 40%, var(--md-surface));
+    --md-surface-container-low: color-mix(in srgb, var(--md-surface-tint) 8%, var(--md-surface));
+    --md-surface-container: color-mix(in srgb, var(--md-surface-tint) 12%, var(--md-surface));
+    --md-surface-container-high: color-mix(in srgb, var(--md-surface-tint) 15%, var(--md-surface));
+    --md-surface-container-highest: color-mix(in srgb, var(--md-surface-tint) 19%, var(--md-surface));
+    --md-surface-variant: color-mix(in srgb, var(--md-surface-tint) 24%, var(--md-surface));
+
+    /* 深色下的轮廓（同 1.1b 的说明）：底越暗，同样比例的混色越看不出来，
+       所以 outline 用到 40%、outline-variant 到 24%。 */
+    --md-outline: color-mix(in srgb, var(--md-surface-tint) 40%, #8e9099);
+    --md-outline-variant: color-mix(in srgb, var(--md-surface-tint) 24%, #44474e);
+    --md-inverse-surface: #e2e2e9;
+    --md-inverse-on-surface: #2f3033;
+    --md-inverse-primary: #0b57d0;
+
+    /* M3 深色下高度靠「面变亮」表达（surface-container-low → highest 逐级变亮），
+       阴影只作补充，所以这里把两级阴影的浓度都压下来，避免出现「黑底上一圈黑边」。
+       各组件已经同时用了色调面 + 阴影：面负责分层，阴影只负责脱离背景。 */
+    --md-elev-1: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 3px 1px rgba(0, 0, 0, .3);
+    --md-elev-2: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 6px 2px rgba(0, 0, 0, .3);
+    --md-elev-3: 0 1px 3px rgba(0, 0, 0, .5), 0 4px 8px 3px rgba(0, 0, 0, .3);
+    --md-elev-4: 0 2px 3px rgba(0, 0, 0, .5), 0 6px 10px 4px rgba(0, 0, 0, .3);
+    --md-elev-5: 0 4px 4px rgba(0, 0, 0, .5), 0 8px 12px 6px rgba(0, 0, 0, .3);
+
+    /* 深色下头像改用微光（见 1.5b 的说明）：
+       黑色投影在深色背景上根本看不出来，所以换成极淡的白色光晕。 */
+    --md-avatar-shadow: var(--md-avatar-glow);
+
+    --heat-0: var(--md-surface-container-high);
+    --heat-1: #004a77;
+    --heat-2: #0b6bb8;
+    --heat-3: #4a95e6;
+    --heat-4: #a8c7fa;
+  }
+}
+
+/* ---- 1.9b 强制亮/暗（统计页「自定义」里的「外观模式」滑块） ----
+   为什么要**复制**一份深色值，而不是复用上面那个媒体查询：
+   媒体查询的生效条件是「系统偏好」，没法从选择器里开关；
+   而滑块要的是「用户选的模式覆盖系统偏好」。
+   于是只能按「系统偏好 × 用户选择」四个象限各写一条：
+     系统深 + 强制亮  → 下面的 data-scheme="light" 块
+     系统浅 + 强制暗  → 下面的 data-scheme="dark" 块
+   （系统深 + 强制暗、系统浅 + 自动，都由上面那个媒体查询负责。）
+
+   ⚠ 维护提醒：1.9 那个媒体查询里的值一改，下面这两块也要跟着改一遍 ——
+   三处是同一套深色令牌的副本。这是纯 CSS 下无法避免的重复
+   （唯一的替代是预处理器或 light-dark()，前者要加构建步骤，后者兼容性还不够）。
+   各主题自己的深色值（1.10 里那六个 html[data-theme] 块）不用重复，
+   因为它们本来就成对写在同一个媒体查询里，data-scheme 只覆盖基础令牌。 */
+html[data-scheme="dark"] {
+  color-scheme: dark;
+  --md-primary: #a8c7fa;
+  --md-on-primary: #062e6f;
+  --md-primary-container: #0842a0;
+  --md-on-primary-container: #d3e3fd;
+  --md-primary-fixed: #d3e3fd;
+  --md-primary-fixed-dim: #a8c7fa;
+  --md-on-primary-fixed: #041e49;
+  --md-on-primary-fixed-variant: #0842a0;
+
+  --md-secondary: #bec6dc;
+  --md-on-secondary: #283041;
+  --md-secondary-container: #3e4759;
+  --md-on-secondary-container: #dae2f9;
+
+  /* 深色下同样从 --md-surface-tint 派生（同 1.2 的说明）。
+     关键点：on-tertiary-container 必须跟着换。
+     容器是从「深色中性灰」兑出来的，明度只比 --md-surface 高一点点，
+     比原来那个 #004a77 亮得多；再用原来的浅色 #c2e7ff 压上去会掉到约 3.8:1，
+     不到 AA。改成比容器更亮一档的 #d7e3f8（同为「容器上的浅色文字」角色），
+     实测各主题下约 9:1。改配色时这两行必须成对改 —— 单独改一个就会崩对比度。 */
+  --md-tertiary: #7fcfff;
+  --md-on-tertiary: #003353;
+  --md-tertiary-container: color-mix(in srgb, var(--md-surface-tint) 24%, #2b303b);
+  --md-on-tertiary-container: #d7e3f8;
+
+  --md-error: #f2b8b5;
+  --md-on-error: #601410;
+  --md-error-container: #8c1d18;
+  --md-on-error-container: #f9dedc;
+
+  --md-success: #b6f0bd;
+  --md-on-success: #00391a;
+  --md-success-container: #0a5227;
+  --md-on-success-container: #c4eed0;
+
+  --md-warning: #f5c518;
+  --md-warning-container: #5c4300;
+  --md-on-warning-container: #ffdf99;
+
+  --md-surface: #111318;
+  /* surface-dim 是「比 surface 略暗」的那一档。上面浅色版已经改成
+     color-mix，这里当时漏改了 —— 原值 #111318 恰好和 --md-surface 相同，
+     既没跟着主题走，也不满足它自己那条「比 surface 略暗」的说明。
+     深色下用黑色往下压，同时带上主题色相。 */
+  --md-surface-dim: color-mix(in srgb, var(--md-surface-tint) 10%, color-mix(in srgb, #000000 25%, #111318));
+  --md-surface-bright: #37393e;
+  --md-on-surface: #e2e2e9;
+  --md-on-surface-variant: #c4c6d0;
+
+  /* 深色下的色调面（同 1.1b）。
+     比例比浅色**更高**：深色底本身接近黑，同样 5% 的混色几乎看不出来，
+     直观感受会退化成「还是灰的」。M3 深色也确实是靠更大的叠加比例
+     把层级和色相一起做出来。
+     明度方向不变 —— 深色下依然是「层级越高、面越亮」，
+     所以最低档比 --md-surface 更暗，高档比它更亮。 */
+  --md-surface-tint: var(--md-primary);
+  --md-surface-container-lowest: color-mix(in srgb, #000000 40%, var(--md-surface));
+  --md-surface-container-low: color-mix(in srgb, var(--md-surface-tint) 8%, var(--md-surface));
+  --md-surface-container: color-mix(in srgb, var(--md-surface-tint) 12%, var(--md-surface));
+  --md-surface-container-high: color-mix(in srgb, var(--md-surface-tint) 15%, var(--md-surface));
+  --md-surface-container-highest: color-mix(in srgb, var(--md-surface-tint) 19%, var(--md-surface));
+  --md-surface-variant: color-mix(in srgb, var(--md-surface-tint) 24%, var(--md-surface));
+
+  /* 深色下的轮廓（同 1.1b 的说明）：底越暗，同样比例的混色越看不出来，
+     所以 outline 用到 40%、outline-variant 到 24%。 */
+  --md-outline: color-mix(in srgb, var(--md-surface-tint) 40%, #8e9099);
+  --md-outline-variant: color-mix(in srgb, var(--md-surface-tint) 24%, #44474e);
+  --md-inverse-surface: #e2e2e9;
+  --md-inverse-on-surface: #2f3033;
+  --md-inverse-primary: #0b57d0;
+
+  /* M3 深色下高度靠「面变亮」表达（surface-container-low → highest 逐级变亮），
+     阴影只作补充，所以这里把两级阴影的浓度都压下来，避免出现「黑底上一圈黑边」。
+     各组件已经同时用了色调面 + 阴影：面负责分层，阴影只负责脱离背景。 */
+  --md-elev-1: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 3px 1px rgba(0, 0, 0, .3);
+  --md-elev-2: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 6px 2px rgba(0, 0, 0, .3);
+  --md-elev-3: 0 1px 3px rgba(0, 0, 0, .5), 0 4px 8px 3px rgba(0, 0, 0, .3);
+  --md-elev-4: 0 2px 3px rgba(0, 0, 0, .5), 0 6px 10px 4px rgba(0, 0, 0, .3);
+  --md-elev-5: 0 4px 4px rgba(0, 0, 0, .5), 0 8px 12px 6px rgba(0, 0, 0, .3);
+
+  /* 深色下头像改用微光（见 1.5b 的说明）：
+     黑色投影在深色背景上根本看不出来，所以换成极淡的白色光晕。 */
+  --md-avatar-shadow: var(--md-avatar-glow);
+
+  --heat-0: var(--md-surface-container-high);
+  --heat-1: #004a77;
+  --heat-2: #0b6bb8;
+  --heat-3: #4a95e6;
+  --heat-4: #a8c7fa;
+}
+
+/* 强制亮色。**必须重写一遍亮色令牌，不能只写 color-scheme: light。**
+   踩过的坑：最初这里只声明了 color-scheme，结果「系统是深色 + 用户选亮色」时
+   页面一点都不变 —— 因为上面 1.9 那个 @media (prefers-color-scheme: dark)
+   按**系统偏好**生效，它照样把 :root 的深色值压上来；
+   color-scheme 只影响原生部件（滚动条、表单控件）的明暗，不改我们的变量。
+   所以这里要把亮色令牌显式写回来；写在 1.10 的主题块**之前**，
+   保证各主题自己的主色覆盖仍然优先。 */
+html[data-scheme="light"] {
+  color-scheme: light;
+
+  --md-primary: #0b57d0;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #d3e3fd;
+  --md-on-primary-container: #041e49;
+  --md-primary-fixed: #d3e3fd;
+  --md-primary-fixed-dim: #a8c7fa;
+  --md-on-primary-fixed: #041e49;
+  --md-on-primary-fixed-variant: #0842a0;
+
+  --md-secondary: #565f71;
+  --md-on-secondary: #ffffff;
+  --md-secondary-container: #dae2f9;
+  --md-on-secondary-container: #131c2b;
+
+  --md-tertiary: #00639b;
+  --md-on-tertiary: #ffffff;
+  --md-tertiary-container: color-mix(in srgb, var(--md-surface-tint) 22%, #d7dbe6);
+  --md-on-tertiary-container: #001d33;
+
+  --md-error: #b3261e;
+  --md-on-error: #ffffff;
+  --md-error-container: #f9dedc;
+  --md-on-error-container: #410e0b;
+
+  --md-success: #146c2e;
+  --md-on-success: #ffffff;
+  --md-success-container: #c4eed0;
+  --md-on-success-container: #072711;
+
+  --md-warning: #7a5900;
+  --md-warning-container: #ffdf99;
+  --md-on-warning-container: #261a00;
+
+  --md-surface: #fdfbff;
+  --md-surface-dim: color-mix(in srgb, var(--md-surface-tint) 10%, #dde3ea);
+  --md-surface-bright: #fdfbff;
+  --md-on-surface: #1a1c1e;
+  --md-on-surface-variant: #44474e;
+
+  /* 色调面与轮廓：比例回到浅色那套（5/8/11/12/16、30/14），
+     否则深色下的高比例会留在亮底上，面板显得发灰。 */
+  --md-surface-tint: var(--md-primary);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: color-mix(in srgb, var(--md-surface-tint) 5%, var(--md-surface));
+  --md-surface-container: color-mix(in srgb, var(--md-surface-tint) 8%, var(--md-surface));
+  --md-surface-container-high: color-mix(in srgb, var(--md-surface-tint) 11%, var(--md-surface));
+  --md-surface-container-highest: color-mix(in srgb, var(--md-surface-tint) 12%, var(--md-surface));
+  --md-surface-variant: color-mix(in srgb, var(--md-surface-tint) 16%, var(--md-surface));
+
+  --md-outline: color-mix(in srgb, var(--md-surface-tint) 30%, #74777f);
+  --md-outline-variant: color-mix(in srgb, var(--md-surface-tint) 14%, #c4c6d0);
+  --md-inverse-surface: #2f3033;
+  --md-inverse-on-surface: #f1f0f4;
+  --md-inverse-primary: #a8c7fa;
+
+  --md-elev-1: 0 1px 2px rgba(0, 0, 0, .3), 0 1px 3px 1px rgba(0, 0, 0, .15);
+  --md-elev-2: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 6px 2px rgba(0, 0, 0, .15);
+  --md-elev-3: 0 1px 3px rgba(0, 0, 0, .3), 0 4px 8px 3px rgba(0, 0, 0, .15);
+  --md-elev-4: 0 2px 3px rgba(0, 0, 0, .3), 0 6px 10px 4px rgba(0, 0, 0, .15);
+  --md-elev-5: 0 4px 4px rgba(0, 0, 0, .3), 0 8px 12px 6px rgba(0, 0, 0, .15);
+
+  /* 头像回到中性投影（深色下是微光，见 1.5b） */
+  --md-avatar-shadow: 0 2px 8px -2px rgba(0, 0, 0, .28);
+
+  --heat-0: var(--md-surface-container-high);
+  --heat-1: #c2e7ff;
+  --heat-2: #7fc4f5;
+  --heat-3: #2b7fd4;
+  --heat-4: #0b57d0;
+}
+
+/* ---- 1.10 主题色（统计页「自定义」里选，存在 danci.profile.v1.theme） ----
+   实现方式：只覆盖 M3 的 primary 一族 + 热力图色阶，其余令牌不动。
+   页面里所有强调色都走 var(--md-primary*)，所以换个主题是全站生效的
+   ——按钮、底栏选中项、进度条、开关、复选框、焦点圈、热力图都会跟着变。
+
+   为什么这几组必须成对出现：
+     primary 决定主色；primary-container 决定选中态与色调面；
+     on-primary-container 决定这些面上的文字（浅色底上必须是深色字，
+     否则对比度崩掉）；inverse-primary 给深底上的反色场景；
+     heat-1..4 是热力图色阶，不跟着主色走的话，换主题后热力图还是蓝的。
+
+   特异性说明：基础浅色写 html[data-theme="x"]，深色写在媒体查询里用
+   同一个选择器（特异性相同），靠书写顺序让深色值生效。 */
+html[data-theme="teal"] {
+  --md-primary: #00696e; --md-on-primary: #ffffff;
+  --md-primary-container: #9df0f4; --md-on-primary-container: #002021;
+  --md-primary-fixed: #9df0f4; --md-primary-fixed-dim: #80d4d8;
+  --md-inverse-primary: #80d4d8;
+  --heat-1: #b8ecef; --heat-2: #6cbbbf; --heat-3: #1d8b90; --heat-4: #00696e;
+}
+html[data-theme="green"] {
+  --md-primary: #146c2e; --md-on-primary: #ffffff;
+  --md-primary-container: #a6f4b8; --md-on-primary-container: #002109;
+  --md-primary-fixed: #a6f4b8; --md-primary-fixed-dim: #8bd79e;
+  --md-inverse-primary: #8bd79e;
+  --heat-1: #c4eed0; --heat-2: #7cc78f; --heat-3: #2c8f4c; --heat-4: #146c2e;
+}
+html[data-theme="yellow"] {
+  --md-primary: #6d5e00; --md-on-primary: #ffffff;
+  --md-primary-container: #f8e287; --md-on-primary-container: #211b00;
+  --md-primary-fixed: #f8e287; --md-primary-fixed-dim: #dbc66e;
+  --md-inverse-primary: #dbc66e;
+  --heat-1: #fbeeb0; --heat-2: #e0cd74; --heat-3: #a08d17; --heat-4: #6d5e00;
+}
+html[data-theme="orange"] {
+  --md-primary: #8b5000; --md-on-primary: #ffffff;
+  --md-primary-container: #ffdcc0; --md-on-primary-container: #2e1500;
+  --md-primary-fixed: #ffdcc0; --md-primary-fixed-dim: #ffb877;
+  --md-inverse-primary: #ffb877;
+  --heat-1: #ffe3cb; --heat-2: #f5b877; --heat-3: #b9741f; --heat-4: #8b5000;
+}
+html[data-theme="purple"] {
+  --md-primary: #6750a4; --md-on-primary: #ffffff;
+  --md-primary-container: #e9ddff; --md-on-primary-container: #21005d;
+  --md-primary-fixed: #e9ddff; --md-primary-fixed-dim: #cfbdfe;
+  --md-inverse-primary: #cfbdfe;
+  --heat-1: #e9ddff; --heat-2: #b79ce8; --heat-3: #7a5fbb; --heat-4: #6750a4;
+}
+html[data-theme="pink"] {
+  --md-primary: #8e4585; --md-on-primary: #ffffff;
+  --md-primary-container: #ffd7f2; --md-on-primary-container: #3a0b36;
+  --md-primary-fixed: #ffd7f2; --md-primary-fixed-dim: #ffb0f0;
+  --md-inverse-primary: #ffb0f0;
+  --heat-1: #ffd7f2; --heat-2: #ef9fdd; --heat-3: #ab61a1; --heat-4: #8e4585;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="teal"] {
+    --md-primary: #4cdade; --md-on-primary: #003739;
+    --md-primary-container: #004f52; --md-on-primary-container: #9df0f4;
+    --md-inverse-primary: #00696e;
+    --heat-1: #004f52; --heat-2: #0d7c81; --heat-3: #52a8ac; --heat-4: #4cdade;
+  }
+  html[data-theme="green"] {
+    --md-primary: #6fdb8a; --md-on-primary: #00391a;
+    --md-primary-container: #0a5227; --md-on-primary-container: #a6f4b8;
+    --md-inverse-primary: #146c2e;
+    --heat-1: #0a5227; --heat-2: #1d7a3c; --heat-3: #4fa468; --heat-4: #6fdb8a;
+  }
+  html[data-theme="yellow"] {
+    --md-primary: #ffdf99; --md-on-primary: #3a2f00;
+    --md-primary-container: #574700; --md-on-primary-container: #f8e287;
+    --md-inverse-primary: #6d5e00;
+    --heat-1: #574700; --heat-2: #8a7413; --heat-3: #c4ab3f; --heat-4: #ffdf99;
+  }
+  html[data-theme="orange"] {
+    --md-primary: #ffb877; --md-on-primary: #492900;
+    --md-primary-container: #6a3c00; --md-on-primary-container: #ffdcc0;
+    --md-inverse-primary: #8b5000;
+    --heat-1: #6a3c00; --heat-2: #9c5e0a; --heat-3: #d18a37; --heat-4: #ffb877;
+  }
+  html[data-theme="purple"] {
+    --md-primary: #cfbdfe; --md-on-primary: #381e72;
+    --md-primary-container: #4f378a; --md-on-primary-container: #e9ddff;
+    --md-inverse-primary: #6750a4;
+    --heat-1: #4f378a; --heat-2: #6f57ab; --heat-3: #a08dd6; --heat-4: #cfbdfe;
+  }
+  html[data-theme="pink"] {
+    --md-primary: #ffb0f0; --md-on-primary: #54114e;
+    --md-primary-container: #722a6b; --md-on-primary-container: #ffd7f2;
+    --md-inverse-primary: #8e4585;
+    --heat-1: #722a6b; --heat-2: #9a4a91; --heat-3: #cf85c4; --heat-4: #ffb0f0;
+  }
+}
+
+/* ============================================================
+   2. 基础与画布
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+/* 让 hidden 属性始终生效（避免被组件自身的 display 覆盖） */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+
+/* 关掉移动端点击时那层半透明高亮。
+   WebKit / Blink（以及安卓 WebView）在手指按下可点元素时，会默认叠一层
+   高亮的矩形色块，形状跟着元素圆角走 —— 手机上看起来就是「按一下冒出
+   一块半透明蓝方块」。它不是任何一条样式写出来的，而是浏览器内建行为，
+   只能用 -webkit-tap-highlight-color 关掉（写 transparent 才是彻底关闭，
+   写 none 无效）。
+
+   放在 html 上让它整站继承，不必给每个控件单独声明。
+   关掉之后按压反馈由各控件自己的 :active 状态层负责（见 .btn::after 等），
+   所以手感不会变「死」；键盘焦点仍由 :focus-visible 的描边表示，两者互不影响。 */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* 按钮、开关这类控件的文字不该在长按/连点时被选中，
+   否则手机上会出现选中高亮，和上面的点击高亮一样突兀。
+   注意只挑「按下就触发动作」的控件，不要选中 .field / .mini-field
+   ——那些是包着输入框的 label，在里面加 user-select:none 会让
+   框里的文字变得选不中、复制不了。 */
+button,
+select,
+.theme-swatch,
+.avatar-preset,
+.switch,
+.checkline {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* 输入框永远保持可选中、可复制 */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="number"],
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body {
+  margin: 0;
+  font: var(--md-body-m);
+  color: var(--md-on-surface);
+  background-color: var(--md-surface);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 纸张纹理 / 纸色光晕整体退役，换成 M3 的纯色 surface。
+   原 .grain 噪声层若还留在 DOM 里也一并中性化，不让它继续叠在内容上。 */
+body::before { content: none; }
+.grain { display: none !important; }
+
+/* 键盘焦点：M3 用 3px 的主色描边 */
+:focus-visible {
+  outline: 3px solid var(--md-primary);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+
+/* 滚动指示条：全部去掉。
+   原先这里把滚动条画成 M3 那种细胶囊。既然要求「不要任何滑动指示条」，
+   就把滑块也藏掉 —— 注意是**只藏外观、不禁用滚动**。
+
+   为什么必须用 `none` 而不是 `transparent`：
+   桌面 Chromium 上 `::-webkit-scrollbar-thumb { background: transparent }`
+   确实能让滑块看不见（实测命中、颜色为 rgba(0,0,0,0)）。
+   但**安卓 WebView 用的是「覆盖式滚动条」（overlay scrollbar）**，
+   它是合成器直接画的一层，不走 CSS 盒模型那套伪元素，所以 transparent
+   在手机上照样看得见一条灰条 —— 这正是「主页和统计页还能看到滚动条」的原因。
+   全部换成 `none`（标准属性）+ `display:none`（旧 WebKit 伪元素）才彻底。
+
+   附带好处：`scrollbar-width: none` 让滚动容器不再为滚动条留槽，
+   内容宽度不会因为「有没有溢出」而跳一下。 */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner { background: transparent; }
+
+.muted { color: var(--md-on-surface-variant); }
+
+.fineprint {
+  margin: 24px auto 0;
+  max-width: 68ch;
+  text-align: center;
+  font: var(--md-body-s);
+  color: var(--md-on-surface-variant);
+}
+
+/* ---- 纸片（chip）：M3 的小圆角标签 ---- */
+.pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 8px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+  border-radius: var(--md-shape-s);
+  vertical-align: middle;
+}
+.pill.ok { color: var(--md-on-success-container); background: var(--md-success-container); }
+
+/* ============================================================
+   3. 通用组件
+   ============================================================ */
+
+/* ---- 3.1 按钮 ----
+   类名沿用 app.js 的既有语义：
+     .btn.primary → 填充按钮（filled）
+     .btn.ghost   → 色调按钮（tonal）
+     .link        → 文本按钮（text）
+   交互反馈统一走 ::after 状态层。
+
+   ⚠ 全站已改成「无描边」体系：按钮一律不带边框。
+   层次靠**底色与状态层**区分，这和 M3 本身的做法一致 ——
+   M3 的四种按钮里只有 outlined 一种带描边，其余三种都靠填充色。
+   需要弱一档的次要操作时，用「色调按钮」（surface 底 + 主色文字），
+   而不是「描边按钮」—— 后者在这个无描边体系里会显得是唯一的例外。 */
+.btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 24px;
+  /* 字形与字距成对出现：--md-* 只装字形，字距靠 --md-track-*，
+     缺哪一条哪一处就会退回 normal。详见 1.3 节顶部说明。 */
+  font: var(--md-label-l);
+  letter-spacing: var(--md-track-label-l);
+  color: var(--md-primary);
+  background: transparent;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              box-shadow var(--md-dur-short) var(--md-ease-standard),
+              color var(--md-dur-short) var(--md-ease-standard);
+}
+/* 状态层：hover 8% / 按下 10%，用当前前景色叠上去 */
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-dur-short) var(--md-ease-standard);
+}
+.btn:hover::after { opacity: var(--md-state-hover); }
+.btn:focus-visible::after { opacity: var(--md-state-focus); }
+.btn:active::after { opacity: var(--md-state-press); }
+.btn:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 2px; }
+
+/* 填充按钮：无描边，靠实心底色 + 状态层 */
+.btn.primary {
+  color: var(--md-on-primary);
+  background: var(--md-primary);
+  box-shadow: var(--md-elev-0);
+}
+.btn.primary:hover { box-shadow: var(--md-elev-1); }
+.btn.primary::after { background: var(--md-on-primary); }
+/* 填充按钮的焦点圈：外描边会被 overflow:hidden 裁掉，所以改成往内画。
+   颜色必须用 on-primary —— 填充按钮底色就是 primary，
+   用 primary 画圈等于在蓝底上画蓝圈，等于没画。 */
+.btn.primary:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--md-on-primary), var(--md-elev-1);
+}
+
+/* 次要按钮 = M3 的「色调按钮」（filled tonal button）：
+   底色 surface-container-highest、文字用主色，一样不带描边。
+   换掉原来的 outline 写法是这次「去描边」的关键一步 ——
+   描边按钮是无描边体系里唯一的例外，改掉它整页语言才统一。 */
+.btn.ghost {
+  color: var(--md-primary);
+  background: var(--md-surface-container-highest);
+}
+.btn.ghost:hover {
+  background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface-container-highest));
+}
+
+/* 危险动作：换成 M3 的 error 角色 */
+.btn.ghost.danger { color: var(--md-error); }
+.btn.ghost.danger:hover {
+  background: color-mix(in srgb, var(--md-error) 14%, var(--md-surface-container-highest));
+}
+
+/* 尺寸变体：字距跟着层级换档（Label Medium 0.5px / Label Large 0.1px） */
+.btn.tiny { min-height: 32px; padding: 7px 16px; font: var(--md-label-m); letter-spacing: var(--md-track-label-m); }
+.btn.large { min-height: 48px; padding: 13px 32px; font: var(--md-label-l); letter-spacing: var(--md-track-label-l); }
+/* 禁用态：M3 规定「容器 12% / 前景 38%」。
+   整只按钮一起降到 38% 会把容器也拉淡，和规格对不上，
+   所以两个百分比各自按色值算出来（--md-state-disabled 是 38%，
+   容器那档 12% 见 --md-state-disabled-container）。 */
+.btn:disabled { cursor: not-allowed; box-shadow: none; }
+.btn:disabled,
+.btn:disabled:hover { color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); }
+/* 禁用时状态层完全不出现 —— 否则「按不下去的按钮」还会跟着 hover 亮一下 */
+.btn:disabled::after { opacity: 0; }
+.btn.primary:disabled {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  background: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+}
+/* 色调按钮禁用后底色也压到同一档，不再靠描边区分 */
+.btn.ghost:disabled { background: color-mix(in srgb, var(--md-on-surface) 12%, transparent); }
+/* 禁用态也不该有任何高度变化 */
+.btn.primary:disabled,
+.btn.primary:disabled:hover { box-shadow: var(--md-elev-0); }
+.btn.primary:disabled:focus-visible { box-shadow: var(--md-elev-0); outline: none; }
+
+/* 按钮里的快捷键标记：M3 里最小的标签层级 */
+.btn kbd {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-family: var(--md-font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  border: 1px solid currentColor;
+  border-radius: var(--md-shape-xs);
+  opacity: .6;
+}
+
+/* ---- 3.2 文本按钮：原来的虚线下划线链接 ---- */
+.link {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  font: var(--md-label-l);
+  letter-spacing: var(--md-track-label-l);
+  color: var(--md-primary);
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              color var(--md-dur-short) var(--md-ease-standard);
+}
+.link:hover { background: color-mix(in srgb, var(--md-primary) 8%, transparent); }
+.link:active { background: color-mix(in srgb, var(--md-primary) 10%, transparent); }
+.link.danger { color: var(--md-error); }
+.link.danger:hover { background: color-mix(in srgb, var(--md-error) 8%, transparent); }
+.link:disabled { color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); cursor: not-allowed; }
+.link:disabled:hover { background: none; }
+
+/* ---- 3.3 图标按钮 ---- */
+.iconbtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--md-on-surface-variant);
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              color var(--md-dur-short) var(--md-ease-standard);
+}
+.iconbtn:hover:not(:disabled) { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+.iconbtn:active:not(:disabled) { background: color-mix(in srgb, var(--md-on-surface) 10%, transparent); }
+.iconbtn:disabled { color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); cursor: not-allowed; }
+
+/* ---- 3.4 文字输入与下拉：M3 的「填充型文本域」（filled text field） ----
+   全站去描边后，输入框不再画完整的一圈框，改成 M3 的填充写法：
+     · 底色用 surface-container-high —— 它比页面底色深一档，
+       白底上的输入框靠这一层底色就能看清，不需要描边
+       （早先用的是 surface-container-lowest，几乎纯白，
+        在同样接近白的页面上会看不出边界）；
+     · 只留底部一条**指示线**（indicator），聚焦时变主色并加粗到 2px。
+       这条线是 M3 填充文本域的定义性特征，不是装饰描边 ——
+       没有它，输入区域就完全没有可辨认的边界了。
+     · 圆角按 M3 只给上面两角（corner-extra-small-top）。 */
+select,
+input[type="text"],
+.cf-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  font: var(--md-body-l);
+  color: var(--md-on-surface);
+  background: var(--md-surface-container-high);
+  border: none;
+  border-bottom: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-field) var(--md-shape-field) 0 0;
+  cursor: pointer;
+  transition: border-color var(--md-dur-short) var(--md-ease-standard),
+              background-color var(--md-dur-short) var(--md-ease-standard);
+}
+input[type="text"] { cursor: text; }
+select:hover, input[type="text"]:hover, .cf-input:hover { border-bottom-color: var(--md-on-surface); }
+/* 聚焦：指示线变主色 + 2px。用 border-bottom-width 而不是 box-shadow ——
+   去掉了四周描边之后，box-shadow 那圈内阴影会重新画出一个「框」，
+   等于把刚去掉的描边换个方式加回来。 */
+select:focus, input[type="text"]:focus, .cf-input:focus {
+  outline: none;
+  border-bottom: 2px solid var(--md-primary);
+  /* 线加粗 1px 会把内容顶起 1px，用等量负外边距抵消，聚焦时不跳动 */
+  margin-bottom: -1px;
+}
+select:focus-visible, input[type="text"]:focus-visible, .cf-input:focus-visible { outline: none; }
+input[type="text"]::placeholder, .cf-input::placeholder { color: var(--md-on-surface-variant); }
+select:disabled { color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); cursor: not-allowed; }
+
+/* 下拉箭头：换成 M3 的描边箭头 */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='%2344474e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M5.5 8 10 12.5 14.5 8'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 20px 20px;
+}
+@media (prefers-color-scheme: dark) {
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='%23c4c6d0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M5.5 8 10 12.5 14.5 8'/></svg>");
+  }
+}
+
+/* ============================================================
+   3.4b 自定义下拉（M3 菜单）
+   ------------------------------------------------------------
+   为什么不用原生 <select>：
+     原生下拉的**弹出层是系统画的**，CSS 完全够不着 —— 在安卓 WebView 上
+     它会按系统主题画成一块白底 + 系统单选钮的浮层，和我们这套 M3 令牌
+     毫无关系（截图里那块白底菜单就是这么来的）。唯一能做的是自己画一个。
+
+   做法：保留原生 <select> 作为**状态载体**（app.js 只跟它打交道：
+     读写 .value、innerHTML 填 option、监听 change），把它视觉上藏起来，
+     上面盖一个同样大小的 trigger；点 trigger 弹出一个 M3 菜单。
+     这样 app.js 一行都不用改，而弹出的东西完全归我们控制。
+
+   select 用 opacity:0 而不是 display:none / visibility:hidden：
+     · display:none 会让它不再接收焦点、也不再被 :focus 触发；
+     · visibility:hidden 同理；
+     · opacity:0 保留它的可聚焦性与可访问性，只是看不见。
+
+   菜单挂在 <body> 下、position:fixed 定位：
+     挂回 field 里的话会被祖先的 overflow / 层叠上下文裁掉，
+     「开始栏」和「编辑弹窗」里都有这种祖先。 */
+.m3sel { position: relative; display: block; width: 100%; min-width: 0; }
+.m3sel > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  /* 压在 trigger 下面，但仍可聚焦（键盘可达性靠它） */
+  z-index: 0;
+  pointer-events: none;
+  margin: 0;
+}
+/* trigger：外形与原来的填充型文本域一致（同底色、同底部指示线、同上圆角） */
+.m3sel-trigger {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 38px 12px 14px;
+  font: var(--md-body-l);
+  color: var(--md-on-surface);
+  text-align: left;
+  background: var(--md-surface-container-high);
+  border: none;
+  border-bottom: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-field) var(--md-shape-field) 0 0;
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              border-color var(--md-dur-short) var(--md-ease-standard);
+}
+.m3sel-trigger:hover { border-bottom-color: var(--md-on-surface); }
+.m3sel-trigger:focus-visible {
+  outline: 3px solid var(--md-primary);
+  outline-offset: 2px;
+}
+.m3sel.is-open > .m3sel-trigger {
+  border-bottom: 2px solid var(--md-primary);
+  /* 线加粗 1px 会把内容顶起 1px，用等量负外边距抵消 */
+  margin-bottom: -1px;
+}
+.m3sel-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 箭头：M3 的描边 chevron，展开时翻转朝上 */
+.m3sel-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  color: var(--md-on-surface-variant);
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.m3sel.is-open .m3sel-arrow { transform: rotate(180deg); }
+/* 禁用态：跟其它控件一致（前景 38%） */
+.m3sel.is-disabled > .m3sel-trigger {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  cursor: not-allowed;
+}
+.m3sel.is-disabled > .m3sel-trigger:hover { border-bottom-color: var(--md-outline); }
+
+/* ---- 菜单本体：M3 的 menu ----
+   形状取 corner-extra-small(4)、高度用 elevation-2、底色用 surface-container。
+   宽度由 JS 撑到和 trigger 一样宽（见 m3select.js 的 syncMenuWidth）。 */
+.m3sel-menu {
+  position: fixed;
+  z-index: 1300;              /* 高于悬浮底栏(1100)，低于提示条(1400) */
+  max-height: 45vh;
+  overflow-y: auto;
+  padding: 8px 0;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-xs);
+  box-shadow: var(--md-elev-2);
+  animation: m3sel-in var(--md-dur-medium) var(--md-ease-decelerate) both;
+}
+@keyframes m3sel-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.m3sel-menu[hidden] { display: none; }
+.m3sel-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;           /* M3 菜单项最小 48dp */
+  padding: 10px 16px 10px 12px;
+  font: var(--md-body-l);
+  color: var(--md-on-surface);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.m3sel-opt:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+.m3sel-opt:active { background: color-mix(in srgb, var(--md-on-surface) 10%, transparent); }
+.m3sel-opt.is-disabled {
+  color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+  cursor: not-allowed;
+}
+.m3sel-opt.is-disabled:hover { background: none; }
+.m3sel-opt-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 选中项左侧的对勾：M3 菜单用「前导对勾」表示当前选中 */
+.m3sel-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--md-primary);
+  visibility: hidden;
+}
+.m3sel-opt.is-selected .m3sel-check { visibility: visible; }
+.m3sel-opt.is-selected .m3sel-opt-text { font-weight: 500; }
+
+/* 「清空统计」：M3 的**填充型 error 按钮**。
+   为什么不跟主题色：它是破坏性操作，红是它的语义，不是装饰 ——
+   换主题色时它必须还是红的，否则「危险」这层意思就丢了。
+   走 error 角色令牌（而不是写死 #d32f2f），深浅色模式下都取到合适的那一档。
+   焦点圈也换成 error：全局 :focus-visible 画的是主色圈，
+   红按钮配一圈主题色会很花。
+
+   ⚠️ 类名刻意**不用** .danger：页面里「导入并覆盖」那个按钮早就带着
+   `class="btn ghost danger"`，而原来根本没有 .danger 的样式定义
+   （所以它一直是个普通的 ghost 按钮）。我一开始给 .danger 补样式，
+   结果把「导入并覆盖」也变成了实心红块 —— 它本来是 ghots（浅底 + 红字），
+   变成实心后文字和底色撞在一起几乎看不见。所以这里另起一个专用类名，
+   不去动 .danger 的既有语义。 */
+.btn.reset-stats {
+  color: var(--md-on-error);
+  background: var(--md-error);
+}
+.btn.reset-stats::after { background: var(--md-on-error); }
+.btn.reset-stats:hover { background: color-mix(in srgb, var(--md-on-error) 10%, var(--md-error)); }
+.btn.reset-stats:focus-visible { outline-color: var(--md-error); }
+
+/* 表单字段与标签 */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-inline { min-width: 220px; }
+.field-label {
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-surface-variant);
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px 20px;
+  margin: 24px 0 4px;
+}
+
+/* ---- 3.5 勾选框：无描边版 ----
+   原来未勾选时是「2px 灰描边空心方块」，那正是要去掉的描边风格。
+   改成 M3 的**填充**做法：
+     · 未勾选 = surface-container-highest 实心圆角方块（比背景深一档，
+       所以看得见，又不靠线条描出来）；
+     · 已勾选 = 主色实心 + 白色对勾；
+     · 半选   = 主色实心 + 白色横杠。
+   尺寸仍是 18dp、圆角 2px，和 M3 的 checkbox 一致。
+   对勾靠 border 画（只给右边和下边），那是图形本身、不是控件外框。 */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  background: var(--md-surface-container-highest);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+input[type="checkbox"]:hover { background: color-mix(in srgb, var(--md-on-surface) 16%, var(--md-surface-container-highest)); }
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background: var(--md-primary);
+}
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: .5px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--md-on-primary);
+  border-width: 0 2px 2px 0;
+  transform: rotate(43deg);
+}
+/* 半选（分类里只选了一部分词书）：一条横杠 */
+input[type="checkbox"]:indeterminate::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 2px;
+  background: var(--md-on-primary);
+  border-radius: 1px;
+}
+input[type="checkbox"]:disabled {
+  background: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+  cursor: not-allowed;
+}
+input[type="checkbox"]:disabled:checked {
+  background: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+}
+
+/* ---- 3.6 单选钮：同样的无描边填充做法 ----
+   未选 = surface-container-highest 实心圆；
+   已选 = 主色实心圆 + 白色圆点（画在 ::after 上）。 */
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  background: var(--md-surface-container-highest);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+input[type="radio"]:hover { background: color-mix(in srgb, var(--md-on-surface) 16%, var(--md-surface-container-highest)); }
+input[type="radio"]:checked { background: var(--md-primary); }
+/* 圆点用 inset 居中：20px 控件扣掉 2px 边框后内径 16px，
+   圆点 10px、四周各留 3px。
+   曾试过放大空隙到 5px（圆点缩到 6px）来消除"看起来偏"的观感，
+   但圆点显得太小，已改回 3px —— 几何上它本来就是正中的
+   （实测圆点中心与控制中心都在同一点），当时的错觉来自间隙偏窄。
+   注：去描边后控件尺寸从 16px 内径变成 20px 整块，
+   所以 inset 取 5px（20 - 2×5 = 10px 圆点）才是居中的。 */
+/* 已选圆点：主色圆底上画一个白色圆点。
+   居中算法沿用原来那套（inset 让圆点四周留白相等），
+   只是颜色从主色改成 on-primary —— 底色现在是主色了，
+   再画主色点等于在蓝底上画蓝点。 */
+input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  background: var(--md-on-primary);
+  border-radius: 50%;
+}
+
+/* ---- 3.6b 涟漪：Material Web 那层「从按下点扩散」的状态层 ----
+   状态层有两种做法：
+     · 静态层 —— :hover/:active 时整块浮起一层均匀的色（上面 .btn::after 就是）；
+     · 涟漪   —— 按下时从手指/光标位置扩散出一个圆。
+   Material Web（@material/web）的按钮两者都做：指针按下时同时铺静态层和涟漪，
+   这也是安卓上最容易被认出来的那个手感。这里补上涟漪这一半。
+
+   实现要点：
+     · 圆要盖满整个按钮 —— 半径取「按下点到四角里最远的那个」的距离；
+     · 直径用 2×半径，再从左/上各退一个半径来居中到按下点；
+     · 动画期间 pointer-events:none，免得这层把后续点击吃掉。
+
+   时长与曲线照抄 Material Web 的 ripple：按下淡入 105ms、松开淡出 375ms，
+   都用 linear（见 设计规范/ripple/internal/_ripple.scss 的
+   `transition-duration: 105ms` 与 `transition: opacity 375ms linear`）。
+   总长 105 + 375 = 480ms，所以关键帧停在 105/480 = 21.875% 处：
+   0 → 21.875% 升到按下态浓度，21.875% → 100% 线性降到 0。
+   一条 CSS 动画就能复刻「先亮起、再慢慢化开」，不必用两段 JS 定时器
+   （少两个定时器就少两处会漏掉的收尾逻辑）。
+
+   关于 scale 的取值：圆的直径本来就按「能盖住最远那个角」算好，
+   所以 scale(1) 恰好铺满控件 —— 那是渐隐结束时的状态，不是最亮的时候。
+   最亮点落在 0.62 是纯观感选择（亮起来时还没铺满，看着像从指尖洇开）；
+   它不影响覆盖范围，因为露底的那一段透明度也已经降到很低了。
+
+   颜色不在这里写死：由 ripple.js 把「当前前景色」写进 --ripple-ink，
+   于是填充按钮上是 on-primary（白）、描边按钮上是 primary、
+   危险动作上是 error —— 涟漪永远和按钮文字同色，
+   这正是 M3 状态层的语义（state layer = 内容色的低透明度叠层）。 */
+.ripple {
+  position: absolute;
+  z-index: 2;
+  border-radius: 50%;
+  background: var(--ripple-ink, currentColor);
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+  animation: ripple-press 480ms linear forwards;
+}
+@keyframes ripple-press {
+  0%       { transform: scale(0); opacity: 0; }
+  21.875%  { transform: scale(0.62); opacity: var(--md-state-press); }
+  100%     { transform: scale(1); opacity: 0; }
+}
+
+/* 尊重「减少动态效果」：不要扩散圆，只留下静态状态层。
+   注意不是把动画压到 .01ms —— 那样会闪一下，
+   直接把涟漪层藏掉、交回给 ::after 的静态层更干净。 */
+@media (prefers-reduced-motion: reduce) {
+  .ripple { display: none; }
+}
+
+/* 整行可点的勾选 / 单选文字行 */
+.checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 0;
+  font: var(--md-body-m);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ---- 3.7 开关：M3 的 52×32 轨道 ---- */
+.switch { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-ui {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: var(--md-shape-full);
+  background: var(--md-surface-container-highest);
+  border: none;
+  transition: background-color var(--md-dur-medium) var(--md-ease-standard);
+}
+.switch-ui::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--md-outline);
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized),
+              width var(--md-dur-short) var(--md-ease-standard),
+              height var(--md-dur-short) var(--md-ease-standard),
+              margin-top var(--md-dur-short) var(--md-ease-standard),
+              background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.switch:hover .switch-ui::after { width: 20px; height: 20px; margin-top: -10px; }
+.switch input:checked + .switch-ui { background: var(--md-primary); }
+.switch input:checked + .switch-ui::after { background: var(--md-on-primary); transform: translateX(20px); }
+.switch input:checked:hover + .switch-ui::after { transform: translateX(16px); }
+.switch input:focus-visible + .switch-ui { outline: 3px solid var(--md-primary); outline-offset: 3px; }
+.switch input:disabled + .switch-ui { opacity: var(--md-state-disabled); cursor: not-allowed; }
+.switch-text { font: var(--md-body-m); color: var(--md-on-surface); }
+
+.grow { flex: 1 1 auto; }
+
+/* 这里原来有一层 .nav-scrim：贴在视口底部的渐变，用来把滚到底栏附近的内容
+   「化开」。已按要求去掉 —— 现在内容就是从底栏下面直接滚过去，不做淡化。
+   相应地 index.html 里那个 <div class="nav-scrim"> 也删掉了；
+   .topbar 的 isolation:isolate 保留，它本来就是为通用层叠上下文加的。 */
+
+/* ============================================================
+   4. 逐屏样式
+   ============================================================ */
+
+/* ---- 4.0 悬浮底栏（= M3 的导航栏 navigation bar） ----
+   原来的实体顶栏整体退役，换成浮在页面底部的胶囊栏：
+     · 两个导航项 —— 主页（词书库）与统计（数据备份所在页）
+     · 末端的图标按钮 —— 使用说明（工具入口，不是页面）
+     · #btnBackHome 是背词页的悬浮返回键，平时 hidden，不占底栏位置
+   栏体不占版面高度，页脚靠 main 的 padding-bottom 让位。 */
+/* .topbar 本身不占版面（height:0），只做定位与层叠的锚点。
+   isolation:isolate 明确要求它自成层叠上下文：底栏(1100)只在内部比大小，
+   整体仍压在 main 之上、弹窗之下，让层序不依赖
+   「.topbar 恰好带了 z-index」这个副作用。 */
+.topbar { position: relative; z-index: 20; height: 0; isolation: isolate; }
+.topbar-actions {
+  position: fixed;
+  z-index: 1100;
+  left: 50%;
+  /* 离屏幕底边 40px（原来 24px）。
+     多出来的这 16px 是为了和系统手势区拉开距离 ——
+     底栏是固定定位的，手机上它离底边太近会同时压住手势线上滑区、
+     也显得「贴边」。原生侧另有一层 insets 留白（见 BUILD-ANDROID.md
+     的 bottomClearance，下限 40dp），两者叠加后视觉上是双层呼吸空间。 */
+  bottom: 40px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  /* 参考图那种胶囊：两端全圆角 */
+  border-radius: var(--md-shape-full);
+  /* 半透明 + 高斯模糊：
+       底色用 color-mix 把 surface-container-high 兑到 72% 不透明，
+       滚到底栏下面的内容会**隐约透出来**，而不是被一块实色硬挡住。
+       模糊半径 20px 决定了「透出来的东西有多糊」——
+       太小会看出下面文字的笔画，太大就糊成一片色块、失去玻璃感。 */
+  background: color-mix(in srgb, var(--md-surface-container-high) 72%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: none;
+  /* 阴影与头像同一套令牌（见 1.5b）：
+     浅色 = 中性黑投影，深色 = 白色微光，都不跟主题色走。
+     原来这里是 var(--md-elev-2) 再叠一层 0 10px 24px -14px rgba(0,0,0,.45)，
+     两级叠起来在窄屏上显得很重 —— 栏体本身已经是半透明 + 模糊的玻璃，
+     阴影只需要把它从背景里托起来一点点，不需要再强调厚度。 */
+  box-shadow: var(--md-avatar-shadow);
+}
+/* 不支持 backdrop-filter 的内核（老 WebView）：退回不透明底色。
+   不退回的话，半透明底 + 没有模糊 = 能看清底下的文字，
+   比现在的「实色挡住」更糟。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar-actions { background: var(--md-surface-container-high); }
+}
+/* 系统的「减少透明度」偏好：同样退回不透明（同 5.x 那条返回条的写法） */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar-actions {
+    background: var(--md-surface-container-high);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+.topbar-nav { display: flex; align-items: center; gap: 6px; }
+
+/* 导航项：参考图里只有图标、没有文字，选中项是一个实心圆。
+   文字保留在 DOM 里给读屏用（视觉上收起）。 */
+.topbar-actions .btn.navi {
+  flex-direction: column;
+  gap: 0;
+  width: 56px;
+  height: 56px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-shape-full);
+  color: var(--md-on-surface-variant);
+  background: none;
+  transition: background-color var(--md-dur-medium) var(--md-ease-emphasized),
+              color var(--md-dur-medium) var(--md-ease-standard),
+              transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.topbar-actions .btn.navi > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* 图标：M3 的实心 24dp 图标用 mask 上色，于是它会跟着按钮的文字颜色走 */
+.topbar-actions .btn.navi::before {
+  content: "";
+  flex: none;
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 24px 24px;
+  mask-size: 24px 24px;
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.topbar-actions .btn.navi:hover::before { transform: scale(1.06); }
+/* 悬停/按下时给一层圆形状态层，和参考图的圆形语汇一致。
+   这两条必须写在这里（而不是 ::before 那组之前）：
+   ::after 的 border-radius / background 要先声明好，
+   后面叠上来的 opacity 才是作用在圆形状态层上。 */
+.topbar-actions .btn.navi::after {
+  border-radius: var(--md-shape-full);
+  background: var(--md-on-surface);
+}
+.topbar-actions .btn.navi:hover::after { opacity: var(--md-state-hover); }
+.topbar-actions .btn.navi:active::after { opacity: var(--md-state-press); }
+#btnHome::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3 4 9.5V20a1 1 0 0 0 1 1h5v-6h4v6h5a1 1 0 0 0 1-1V9.5z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3 4 9.5V20a1 1 0 0 0 1 1h5v-6h4v6h5a1 1 0 0 0 1-1V9.5z'/></svg>");
+}
+#btnStats::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z'/></svg>");
+}
+
+/* 当前所在页：底栏对应项换成主色（M3 的 active indicator 语义）。
+   :has() 读「现在哪个 .screen 带 is-active」，于是不必改 app.js 的 show()，
+   样式层自己就能跟着页面状态变。不认识 :has() 的旧内核整条跳过，
+   退化成普通的未选中外观，功能不受影响。
+   注意锚点必须写成 body:has(...)：
+   .topbar 是 <header>，main 是它的兄弟而不是 .topbar-actions 的兄弟，
+   早先写成 .topbar-actions:has(~ main ...) 永远匹配不上。 */
+/* 当前所在页：底栏对应项变成一个实心圆形指示器（参考图里那个蓝色圆）。
+   两套写法并存：
+     · :has() —— 现代内核，不用 JS 也能跟着页面状态走；
+     · html.nav-stats / html.nav-study —— 旧内核，由 nav-bridge.js 打类补上。
+   不认识 :has() 的浏览器会整条跳过，功能不受影响。 */
+body:has(#screen-library.is-active) #btnHome,
+body:has(#screen-done.is-active) #btnHome,
+html.nav-stats #btnStats,
+.topbar-actions #btnHome.is-current,
+.topbar-actions #btnStats.is-current {
+  color: var(--md-on-primary);
+  background: var(--md-primary);
+}
+body:has(#screen-stats.is-active) #btnStats {
+  color: var(--md-on-primary);
+  background: var(--md-primary);
+}
+/* 选中项不叠 hover 状态层，否则蓝色上再压一层会发灰 */
+.topbar-actions #btnHome.is-current::after,
+.topbar-actions #btnStats.is-current::after,
+body:has(#screen-library.is-active) #btnHome::after,
+body:has(#screen-stats.is-active) #btnStats::after {
+  background: var(--md-on-primary);
+}
+
+/* 使用说明：只有图标的圆形工具按钮，文字留给读屏 */
+#btnHelp {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  min-width: 0;
+  padding: 0;
+  margin-left: 4px;
+  border: none;
+  border-radius: var(--md-shape-full);
+  color: var(--md-on-surface-variant);
+  background: none;
+}
+#btnHelp > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+#btnHelp::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26A2 2 0 0 0 12 7a2 2 0 0 0-2 2H8a4 4 0 0 1 8 0c0 .88-.36 1.68-.93 2.25z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26A2 2 0 0 0 12 7a2 2 0 0 0-2 2H8a4 4 0 0 1 8 0c0 .88-.36 1.68-.93 2.25z'/></svg>");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 24px 24px;
+  mask-size: 24px 24px;
+}
+#btnHelp:hover { color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 8%, transparent); }
+
+/* ---- 4.0b 背词页：藏起悬浮底栏，改成顶部一条半透明的「返回词书库」 ----
+   同样两套写法并存：:has() 给现代内核，html.nav-study 给旧内核。 */
+body:has(#screen-study.is-active) .topbar-actions,
+html.nav-study .topbar-actions { display: none; }
+
+/* 返回条：不定位、参与正常文档流，排在 .hud（背词进度）上方，
+   所以它永远不会盖住任何信息 —— 这也是从「悬浮圆钮」换过来的原因，
+   圆钮在手机上正好压在 HUD 的「第 N 轮」那一行上。
+
+   半透明 + 背景模糊，让它看得出是浮在页面之上的一层，
+   但底下的内容仍然隐约可见。 */
+#btnBackHome.back-home {
+  position: static;
+  display: flex !important;      /* 覆盖样式表里 [hidden]{display:none!important} */
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  margin: 0 0 12px;
+  padding: 11px 16px;
+  font: var(--md-label-l);
+  letter-spacing: var(--md-track-label-l);
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-surface-container-high) 72%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: var(--md-shape-l);
+  text-align: left;
+  white-space: nowrap;
+}
+/* 左侧一个返回箭头，和文字一起表明这是「回去」的动作 */
+#btnBackHome.back-home::before {
+  content: "";
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z'/></svg>");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 20px 20px;
+  mask-size: 20px 20px;
+}
+#btnBackHome.back-home::after { border-radius: var(--md-shape-l); background: var(--md-primary); }
+#btnBackHome.back-home:hover { background: color-mix(in srgb, var(--md-primary) 10%, var(--md-surface-container-high)); }
+/* 系统的「减少透明度」偏好下，半透明层会变得难读，直接给不透明底色 */
+@media (prefers-reduced-transparency: reduce) {
+  #btnBackHome.back-home {
+    background: var(--md-surface-container-high);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* 品牌 / 用户头像：M3 的圆形头像。
+   内容是预设字符，或是 profile.js 上传照片后写入的 background-image。
+   底色是全站统一的纯色 primary-container（已去渐变）。 */
+.brand-seal {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  font: var(--md-title-l);
+  font-weight: 500;
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+  border-radius: var(--md-shape-full);
+  /* 中性投影，不跟主题色（见 1.5b 的 --md-avatar-shadow） */
+  box-shadow: var(--md-avatar-shadow);
+}
+/* 横幅里的头像：底色换成实心 primary，与横幅的 primary-container 拉开层次。
+   覆盖的是 background 简写而不是单写 background-color ——
+   简写会一并把 background-image 复位成 none，
+   将来若上面那条改回渐变也不会从这里漏出来。 */
+.library-hero .brand-seal {
+  color: var(--md-on-primary);
+  background-image: none;
+  background-color: var(--md-primary);
+  /* 主页这个头像的投影也走中性色（原来是 color-mix(primary 60%)，
+     换主题会跟着变黄 / 变粉）。深色下由令牌自动切成微光。 */
+  box-shadow: var(--md-avatar-shadow);
+}
+/* 有照片时，背景图铺满整个圆 */
+.brand-seal.has-photo,
+.avatar-current.has-photo {
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.brand-text { min-width: 0; }
+/* 顶栏标题 = 用户名称。
+   字号比原来的 Title Large(22px) 大得多，取 Display 那一档的量级 ——
+   这是参考图里「大留白 + 大号字」的核心：顶栏不再是个信息条，
+   而是一块有主张的版面。
+   字距按 M3 的 Display / Headline 档（0），所以不写 letter-spacing。 */
+.brand-text h1 {
+  margin: 0;
+  font: var(--md-display-s);
+  font-weight: 500;
+  /* 大号标题是这个版面的主角，所以放得比常规 Display Small 更大一档。
+     上限 60px：再大在窄屏上会被「你好！」这种短词撑得过于空，反而失衡。 */
+  font-size: clamp(40px, 11vw, 60px);
+  line-height: 1.1;
+  color: var(--md-on-surface);
+  overflow-wrap: anywhere;
+}
+/* 副标题（= 个性签名）。和大标题之间留出呼吸 */
+.brand-text p {
+  margin: 8px 0 0;
+  font: var(--md-body-m);
+  letter-spacing: var(--md-track-body-m);
+  color: var(--md-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+/* ---- 词书库顶栏：大留白 + 右侧居中头像 ----
+   结构：左边一列文字（用户名 / 签名），右边头像，整体垂直居中。
+   去掉了原来的 primary-container 底色 —— 参考图是**纯背景**上的大留白，
+   不是一块有底色的卡片。留白 + 大号标题本身就构成段落感。 */
+.library-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(16px, 4vw, 32px);
+  /* 上面留得比原来多：大留白的关键就是「上面空得多」 */
+  margin: clamp(8px, 3vw, 24px) 0 clamp(20px, 4vw, 32px);
+  padding: 0 clamp(2px, 1vw, 8px);
+  background: none;
+  border-radius: 0;
+}
+/* 头像固定尺寸、不参与压缩，靠 align-items:center 垂直居中于文字块。
+   尺寸跟标题一起放大：标题 40~60px、头像 84~116px，
+   两者大致保持「头像高度 ≈ 标题字号 × 2」的比例，视觉重量才对得上。 */
+.library-hero .brand-seal {
+  flex: none;
+  width: clamp(84px, 22vw, 116px);
+  height: clamp(84px, 22vw, 116px);
+  font-size: clamp(34px, 10vw, 48px);
+}
+
+/* ---- 背景词：随机展示一个词条（对应参考图里那堆随机封面） ----
+   整块是按钮，点了换一个。文字直接压在页面背景上，不给卡片底色 ——
+   参考图里的封面也是「浮在白底上」的，加个底框就没了那个味道。
+   最小高度用来预留空间：不同词条的正文长短不一，
+   不预留的话每换一次词整页都会跳一下。 */
+.hero-word {
+  display: flex;
+  flex-direction: column;
+  /* 居中显示：文字块整体居中在模块里，而不是靠左 */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  /* 参考图那堆封面占掉一大片留白，这里用最小高度把那份「空」留出来 */
+  min-height: clamp(150px, 32vw, 230px);
+  margin: 0 0 clamp(20px, 4vw, 32px);
+  padding: clamp(14px, 4vw, 26px) clamp(4px, 1.5vw, 12px);
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  /* 显式压掉 <button> 的原生外观。只写 background: none 不够 ——
+     按钮在 :focus 等状态下还会有系统默认底色，必须把 appearance 一起按掉，
+     否则点过之后会残留一块方形的浅色底，破坏「文字浮在白底上」的观感。 */
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  background-color: transparent;
+  border: none;
+  border-radius: var(--md-shape-l);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.hero-word:hover { background-color: color-mix(in srgb, var(--md-primary) 6%, transparent); }
+.hero-word:active { background-color: color-mix(in srgb, var(--md-primary) 10%, transparent); }
+/* 键盘焦点：沿用全站的 3px 主色描边（这是焦点指示，不是装饰描边） */
+.hero-word:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 4px; }
+/* 英文词：整块版面里最大的字 */
+.hero-word-en {
+  font: var(--md-display-s);
+  font-weight: 500;
+  font-size: clamp(26px, 7vw, 38px);
+  line-height: 1.2;
+  color: var(--md-primary);
+  overflow-wrap: anywhere;
+}
+/* 词性：小号纸片，和下面的释义在视觉上分开 */
+.hero-word-pos {
+  padding: 2px 10px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-tertiary-container);
+  background: var(--md-tertiary-container);
+  border-radius: var(--md-shape-chip);
+}
+.hero-word-cn {
+  font: var(--md-title-l);
+  font-size: clamp(17px, 4.5vw, 21px);
+  line-height: 1.4;
+  color: var(--md-on-surface);
+  overflow-wrap: anywhere;
+}
+.hero-word-ex {
+  margin-top: 2px;
+  /* 例句单独限宽并居中：不限宽的话长例句会顶到模块两边，
+     max-width 控制在阅读舒适的 62ch，再由父级的 align-items:center 居中 */
+  max-width: 62ch;
+  font: var(--md-body-m);
+  letter-spacing: var(--md-track-body-m);
+  line-height: 1.7;
+  color: var(--md-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+/* 词书库为空时整块不出现；某个词条缺词性 / 例句时那一行也不出现 */
+.hero-word[hidden] { display: none; }
+.hero-word-en:empty,
+.hero-word-cn:empty { display: none; }
+
+/* 自定义签名：#brandSign 与 #brandSub 是并列的两个元素，同一时刻只显示一个。
+   设了签名时 app.js 写进 #brandSub 的轮次信息只是被 hidden 收起，
+   没有被销毁，取消签名后立刻照旧显示。 */
+.brand-sign {
+  margin: 8px 0 0;
+  font: var(--md-body-m);
+  letter-spacing: var(--md-track-body-m);
+  color: var(--md-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  max-width: var(--md-page-max);
+  margin: 0 auto;
+  /* 上留白：**五倍**于常规量（原 20~40px → 100~200px）。
+     这个数是刻意留大的 —— 顶栏现在是「大号用户名 + 一行签名」的版面，
+     上面空出一大截才有参考图那种编辑精选辑的呼吸感。
+       上 clamp(100px, 25vw, 200px) —— 5 × clamp(20px, 5vw, 40px)
+       下 128px —— 给悬浮底栏让位（见 .topbar-actions），这个没有放大
+     两者都用 clamp，窄屏自动收一点。 */
+  padding: clamp(100px, 25vw, 200px) var(--md-gutter) 128px;
+}
+/* 背词页是例外：顶部改用固定 50px，不跟着上面那个 5 倍量走 ——
+   那一屏有悬浮返回条和背词进度，留太多会把词卡挤到屏幕下半截。
+   50 是「比常规量(20~40)略多、又远小于 100~200」的中间值，
+   实测下来返回条上方有一段明显的空，词卡仍在首屏完整可见。
+   固定值而不是 clamp：这里要的是「和屏幕宽度无关的一段固定空隙」，
+   clamp 会在大屏上飘到 40、小屏掉到 20，反而不稳定。
+   （用 :has() 给现代内核，html.nav-study 给旧内核 —— 与页面里其它
+     按屏切换的写法一致，见 4.0b。） */
+body:has(#screen-study.is-active) main,
+html.nav-study main {
+  padding-top: 50px;
+}
+
+.screen { display: none; }
+.screen.is-active {
+  display: block;
+  animation: screen-in var(--md-dur-medium) var(--md-ease-decelerate) both;
+}
+
+/* ---- 背词页：整屏铺满、不出现上下滚动 ----
+   为什么需要：这一屏从上到下有「返回条 / 进度 HUD / 词卡 / 作答按钮 / 页脚」
+   五段，词卡高度又是按本轮最高那张卡的**自然高度**锁定的（见 app.js 的
+   lockCardHeight）。词卡一高，整页就超出视口，于是要么能上下滚、要么内容被切掉。
+   做法：把这一屏做成一条**纵向 flex 链**，让词卡区吃掉「其余几段占完之后剩下的高度」，
+   词卡再被 max-height:100% 夹住。这样：
+     · 内容矮的时候词卡区照旧居中留白，版面不变；
+     · 内容高的时候词卡自动变矮（内部 .answer 是 flex 子项 + overflow:hidden，
+       会按可用空间收缩），下面几段永远在屏幕内。
+   两个必须一起给的东西：
+     · min-height:0 —— flex 子项默认 min-height:auto 会拒绝收缩到内容高度以下，
+       漏了它这条链子等于没接上；
+     · 显式给 .screen.is-active 的高度 —— 父级 main 是块级、没有确定高度，
+       子元素的 100% 会算成 auto。 */
+body:has(#screen-study.is-active) main,
+html.nav-study main {
+  /* 底部不再留 128px：那是给悬浮底栏让位的，而背词页底栏是隐藏的
+     （见 4.0b）。省下的这 100 多像素正好够把整屏装进视口。 */
+  padding-bottom: 16px;
+}
+body:has(#screen-study.is-active) .screen.is-active,
+html.nav-study .screen.is-active {
+  display: flex;
+  flex-direction: column;
+  /* 撑满 main 的内容盒；用 dvh 而不是 vh 是为了跟手浏览器地址栏的收放
+     （vh 在手机上会把「被地址栏占掉的那一截」也算进去，于是永远差一点）。 */
+  height: calc(100vh - 50px - 16px);
+  height: calc(100dvh - 50px - 16px);
+  overflow: hidden;
+}
+/* 剩下的高度全给词卡区；min-height:0 见上面的说明 */
+body:has(#screen-study.is-active) .card-stage,
+html.nav-study .card-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- 4.1 拖放区：M3 的虚线描边容器 ---- */
+.dropzone {
+  position: relative;
+  margin: 8px auto 0;
+  max-width: 720px;
+  padding: clamp(28px, 5vw, 48px) 24px;
+  text-align: center;
+  background: var(--md-surface-container-low);
+  border-radius: var(--md-shape-l);
+  transition: background-color var(--md-dur-medium) var(--md-ease-standard);
+}
+.dropzone.is-over { background: var(--md-primary-container); }
+.dropzone-icon { color: var(--md-on-surface-variant); width: 48px; margin: 0 auto 12px; }
+.dropzone-icon svg { width: 100%; display: block; }
+.dropzone h2 { margin: 0 0 8px; font: var(--md-title-l); color: var(--md-on-surface); }
+.dropzone-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.dropzone-actions .btn { text-decoration: none; }
+
+/* 紧凑版（词书库页）：一行排开 */
+.dropzone.compact {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 3vw, 28px);
+  max-width: none;
+  margin: 0;
+  padding: 20px clamp(18px, 3vw, 24px);
+  text-align: left;
+  background: var(--md-surface-container-low);
+}
+.dropzone.compact .dropzone-icon { flex: none; width: 32px; margin: 0; }
+.dropzone-copy { flex: 1 1 auto; min-width: 0; }
+.dropzone-copy h2 { margin: 0 0 6px; font: var(--md-title-m); letter-spacing: var(--md-track-title-m); }
+.dropzone-copy p {
+  margin: 0;
+  max-width: 68ch;
+  font: var(--md-body-s);
+  line-height: 1.7;
+  color: var(--md-on-surface-variant);
+}
+.dropzone-copy b { color: var(--md-on-surface); font-weight: 600; }
+.dropzone.compact .dropzone-actions { flex: none; justify-content: flex-end; }
+
+/* ---- 4.2 复习本：M3 的「低层容器」色调面 ---- */
+.reviewbook {
+  margin: 20px 0 0;
+  padding: clamp(18px, 3vw, 24px);
+  background: var(--md-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-l);
+}
+.reviewbook-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border: none;
+}
+.reviewbook-title { flex: 1 1 auto; min-width: 0; }
+.reviewbook-title h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--md-title-m); letter-spacing: var(--md-track-title-m); }
+.reviewbook-meta { margin: 4px 0 0; font: var(--md-body-s); letter-spacing: var(--md-track-body-s); color: var(--md-on-surface-variant); }
+.reviewbook-badge {
+  flex: none;
+  padding: 5px 12px;
+  font: var(--md-label-m);
+  color: var(--md-on-tertiary-container);
+  background: var(--md-tertiary-container);
+  border-radius: var(--md-shape-s);
+}
+.reviewbook-note { margin: 12px 0 0; font: var(--md-body-s); line-height: 1.8; color: var(--md-on-surface-variant); }
+
+.reviewbook-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.reviewbook-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--md-shape-m);
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.reviewbook-item + .reviewbook-item { margin-top: 2px; }
+.reviewbook-item:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.rb-w { flex: none; font: var(--md-title-s); letter-spacing: var(--md-track-title-s); color: var(--md-on-surface); }
+.rb-m {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: var(--md-body-s);
+  color: var(--md-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rb-tags { flex: none; display: flex; align-items: center; gap: 6px; }
+/* 纸片：M3 的 8dp 圆角 */
+.rb-tag { padding: 4px 10px; font: var(--md-label-s); border-radius: var(--md-shape-chip); white-space: nowrap; }
+.rb-tag.rb-forget { color: var(--md-on-error-container); background: var(--md-error-container); }
+.rb-tag.rb-ok { color: var(--md-on-success-container); background: var(--md-success-container); }
+.rb-tag.rb-weight { color: var(--md-on-surface-variant); background: var(--md-surface-container-highest); }
+/* 忘得多的词：只压一道 error 色的示意条 + 极淡的底。
+   原来整行铺满 error 容器色，四五条连在一起糊成一大块红，太重；
+   M3 里这种「提示重点」的强度靠一条 accent 和一个淡色调面就够了。 */
+.reviewbook-item.is-heavy {
+  background: color-mix(in srgb, var(--md-error) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--md-error);
+}
+.reviewbook-item.is-heavy:hover { background: color-mix(in srgb, var(--md-error) 14%, transparent); }
+.reviewbook-empty,
+.reviewbook-more { padding: 16px 12px; font: var(--md-body-s); color: var(--md-on-surface-variant); }
+.reviewbook-more { margin-top: 4px; }
+
+.reviewbook-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border: none;
+}
+.reviewbook-tip { font: var(--md-body-s); }
+
+/* ---- 4.3 词书库 ---- */
+.library {
+  margin: 20px 0 0;
+  padding: clamp(18px, 3vw, 24px);
+  background: var(--md-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-l);
+}
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+}
+.library-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: var(--md-title-l); }
+.library-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+.booklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+/* 一本词书 = 一张 M3 列表卡片。
+   内边距反而收小一点（横向 12px 里有一部分交给 .group-books 的 padding，
+   两者相加仍是 16px 的观感），省下来的空间留给外边距 ——
+   这样选中时那块主色圆角矩形四周才有留白，不会顶到分组标题或下一行。 */
+.book {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  border-radius: var(--md-shape-m);
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.book:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+/* 选中的词书：主色容器 + 主色描边，和上下左右都留出间距 */
+.book.is-selected {
+  background: var(--md-primary-container);
+  outline: 1px solid color-mix(in srgb, var(--md-primary) 32%, transparent);
+  outline-offset: -1px;
+}
+.book.is-selected:hover {
+  background: color-mix(in srgb, var(--md-primary-container) 88%, var(--md-primary));
+}
+.book.is-selected .book-name { color: var(--md-on-primary-container); }
+
+.book-check { flex: none; display: grid; place-items: center; cursor: pointer; }
+.book-main { flex: 1 1 auto; min-width: 0; }
+.book-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.book-index { flex: none; font: var(--md-label-m); font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); }
+.book-name {
+  font: var(--md-title-s);
+  letter-spacing: var(--md-track-title-s);
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 查重冲突标记 */
+.cf-tag {
+  flex: none;
+  padding: 4px 10px;
+  font: var(--md-label-s);
+  white-space: nowrap;
+  color: var(--md-on-error-container);
+  background: var(--md-error-container);
+  border: none;
+  border-radius: var(--md-shape-s);
+  cursor: help;
+}
+.book-meta {
+  margin: 4px 0 0;
+  font: var(--md-body-s);
+  color: var(--md-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 分批背的进度：M3 的线性进度条 */
+.book-prog { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.prog-bar {
+  flex: 1 1 auto;
+  min-width: 48px;
+  height: 4px;
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-full);
+  overflow: hidden;
+}
+.prog-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--md-primary);
+  border-radius: var(--md-shape-full);
+  transition: width var(--md-dur-long) var(--md-ease-emphasized);
+}
+.prog-text { flex: none; font: var(--md-label-s); color: var(--md-on-surface-variant); white-space: nowrap; }
+
+.book-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+
+.empty-state {
+  margin: 16px 0 4px;
+  padding: 32px 20px;
+  text-align: center;
+  font: var(--md-body-m);
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-container);
+  border: none;
+  border-radius: var(--md-shape-m);
+}
+.library-tip { margin: 14px 0 0; font: var(--md-body-s); line-height: 1.75; color: var(--md-on-surface-variant); }
+
+/* ---- 4.4 开始栏 ---- */
+.startbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  margin: 20px 0 0;
+  padding: 16px clamp(16px, 3vw, 24px);
+  background: var(--md-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-l);
+}
+.startbar-opts { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; }
+.startbar-opts .field-inline { min-width: 200px; }
+.startbar-opts select { min-height: 40px; padding: 8px 36px 8px 14px; font: var(--md-body-m); }
+.startbar-main { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-left: auto; }
+.sel-summary { font: var(--md-body-m); color: var(--md-on-surface-variant); }
+
+/* ---- 4.5 背词页 HUD ---- */
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: 840px;
+  margin: 0 auto 20px;
+  padding: 12px 20px;
+  background: var(--md-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-l);
+  /* 描边进度条的定位基准 */
+  position: relative;
+  /* 让模块自己裁掉描边外溢的那一半（见下面 .hud-ring 的说明）。
+     这是必要的：rect 的线是「居中」在边界上画的，一半在模块外。 */
+  overflow: hidden;
+}
+.hud-round { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.hud-round-line { display: flex; align-items: baseline; gap: 6px; }
+.hud-books {
+  margin: 0;
+  max-width: min(400px, 40vw);
+  font: var(--md-body-s);
+  color: var(--md-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-label { font: var(--md-title-s); color: var(--md-on-surface-variant); }
+.hud-round-num {
+  font: var(--md-headline-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--md-on-surface);
+}
+.hud-stats { display: flex; align-items: center; gap: 12px; font: var(--md-body-s); letter-spacing: var(--md-track-body-s); color: var(--md-on-surface-variant); }
+.hud-stats b { font: var(--md-title-m); letter-spacing: var(--md-track-title-m); font-variant-numeric: tabular-nums; color: var(--md-on-surface); }
+.hud-stats .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--md-outline-variant); }
+
+/* ---- 描边进度条：沿着 .hud 自己的边框跑一圈 ----
+   原来是「第 N 轮」右边一个 56px 的圆环。改成描模块的边之后：
+     · 进度不再是塞在角落里的一个小控件，而是整个模块的状态；
+     · 少了一个独立的元素，HUD 里那行也更宽松。
+
+   画法：绝对定位铺满 .hud 的 SVG，里面两条 <path>（轨道 + 进度），
+   路径本身是一圈**圆角矩形**，由 app.js 的 buildHudRingPath() 按模块
+   实测宽高生成；JS 只改 stroke-dashoffset 推进度，
+   因为 path 上写了 pathLength="100"，周长已归一化，不用算圆角矩形周长。
+
+   这里只描述**渲染侧**的约束；路径为什么用 <path> 而不是 <rect rx>、
+   半径怎么取、为什么要内缩半个线宽，都写在 buildHudRingPath() 的注释里。
+   本文件负责的是：
+     · 线宽 3px；
+     · 描边不参与布局（绝对定位 + pointer-events:none）；
+     · 压不住内容（z-index 与 .hud 的背景、内容项的关系）； */
+.hud-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* 描边内缩半个线宽后，路径本身已经落在模块内侧；
+     overflow 保持 visible 以免 SVG 自己再裁一次（模块那层会正常裁圆角）。 */
+  overflow: visible;
+  /* 描边压在模块边框上，所以别被 .hud 的内容盖住。
+     z-index 给 1（不是 0）：.hud 自己有背景色，z-index:0 的绝对定位子元素
+     可能被压在背景之下 —— 实测这样写描边整条看不见。
+     内容那两项也是 z-index:1，且按 DOM 顺序排在 SVG 之后，所以文字仍在描边之上。 */
+  z-index: 1;
+}
+.hud-ring-track,
+.hud-ring-bar {
+  fill: none;
+  stroke-width: 3;
+}
+/* 轨道（未填充的那一圈）不画：只让「已填充」的部分可见。
+   早先给轨道上了 outline 色，想让边框始终可见，但深色模式下那圈灰边
+   和模块底色对比太弱、看着像没对齐；而且用户要的就是「只有进度」。
+   元素保留在 DOM 里（不删路径、不删 CSS 规则）——
+   哪天想再显示轨道，把这条 display 去掉即可。 */
+.hud-ring-track { display: none; }
+.hud-ring-bar {
+  stroke: var(--md-primary);
+  stroke-linecap: round;
+  /* 周长归一化为 100，所以 dash 直接用「百分数」当长度单位 */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  /* 进度为 0 时靠透明度藏起来（app.js 的 updateHud 负责切换）。
+     为什么不用 display:none / hidden：那会让浏览器把元素当成「刚插入」，
+     把 stroke-dashoffset 的过渡整段跳过 —— 首次得题时描边会以当时的
+     长度凭空蹦出来，没有生长过程（实测 dashoffset 从 100px 直接跳到 75px）。
+     常驻 + opacity 过渡则让「淡入」和「生长」同时发生，
+     而且 opacity:0 连同 0% 时可能残留的那一个抗锯齿像素一起不可见。 */
+  opacity: 0;
+  transition:
+    stroke-dashoffset var(--md-dur-long) var(--md-ease-emphasized),
+    opacity var(--md-dur-medium) var(--md-ease-standard-decelerate);
+}
+/* 进度文字：跟在「第 N 轮」后面，做成一枚小胶囊 */
+.hud-ring-text {
+  align-self: center;
+  padding: 1px 8px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+  border-radius: var(--md-shape-full);
+}
+/* 内容要压在描边之上 */
+.hud > .hud-round,
+.hud > .hud-stats { position: relative; z-index: 1; }
+
+/* ---- 4.6 词卡：M3 的「低层填充卡片」 ---- */
+.card-stage { display: grid; place-items: center; padding: 8px 0 24px; }
+
+.wordcard {
+  position: relative;
+  width: min(680px, 100%);
+  min-height: 340px;
+  padding: 24px clamp(20px, 4vw, 40px) 28px;
+  background: var(--md-surface-container-low);
+  border: none;
+  /* 卡片形状：M3 的卡片是 corner-medium(12)，但这张词卡是背词页唯一的主视觉面，
+     用 medium 会显得方。取 Expressive 更新里补的 large-increased(20) ——
+     它正是「比卡片更圆、又不到对话框那么圆」的那一档。
+     窄屏再降一档到 large(16)，见 6. 响应式。 */
+  border-radius: var(--md-shape-l-increased);
+  /* 词卡不带阴影：它是背词页的主视觉面，底色本身就比页面背景亮一档
+     （surface-container-low vs surface），层级靠**色调差**表达就够了。
+     再加一层 elev-1 会在卡片四周糊出一圈灰边，窄屏上尤其显脏。 */
+  box-shadow: none;
+  animation: card-in var(--md-dur-long) var(--md-ease-emphasized) both;
+}
+/* 原来那张错位的纸（负 z-index 的 ::before）退役 */
+.wordcard::before { content: none; }
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+.wordcard.is-flipping { animation: card-flip var(--md-dur-medium) var(--md-ease-emphasized) both; }
+@keyframes card-flip {
+  0% { opacity: 1; transform: none; }
+  45% { opacity: .35; transform: translateY(-6px) scale(.99); }
+  100% { opacity: 1; transform: none; }
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font: var(--md-label-m);
+  color: var(--md-on-surface-variant);
+}
+.card-flag { color: var(--md-warning); }
+
+.card-body { display: flex; flex-direction: column; }
+
+/* ---- 固定卡片高度：揭示答案前后下方的控件不许位移 ----
+   问题：问句状态下只有「中文意思」，揭示后多了答案词 / 词性 / 发音 / 例句，
+   卡片被内容撑高，下面的按钮整排往下跳。
+   做法：高度由 app.js 量出**本轮所有词里最高的那张**（lockCardHeight），
+   再把这个值写成 --card-h 锁死。这样：
+     · 每张卡都一样高，翻到下一张不会变；
+     · 揭示前后也一样高，按钮不动。
+   为什么不在 CSS 里写死一个 min-height：不同词条的行数差很多
+   （一个长例句能占三行），写死要么矮了被裁、要么高了留一大片空白。
+   为什么锁在「本轮最高」而不是「当前这张的最高」：同一轮里逐张变也会跳。
+   溢出处理：.answer 用 flex 占住剩余空间并 overflow:hidden，
+   超出的部分由 app.js 检测（scrollHeight > clientHeight）后
+   在发音按钮右边亮出「完整内容」。 */
+.wordcard {
+  height: var(--card-h, auto);
+  /* 这一条是兜底，不是主要手段：真正把高度夹进屏幕的是 app.js 的
+     lockCardHeight()（它按实测可用空间算最终的 --card-h）。
+     这里再加一道 max-height 是为了「窗口在答题中途被改变、而 resize 防抖
+     还没跑完」的那几帧里不至于把下面的按钮顶出去。 */
+  max-height: 100%;
+}
+
+.card-body {
+  /* 让 .answer 能分到「卡片剩余高度」，overflow 检测才有意义 */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.meaning-wrap { flex: none; }
+.answer {
+  /* 占住剩下的空间，超出的裁掉（配合固定高度）。
+     min-height:0 不能省：flex 子项默认 min-height:auto 会拒绝收缩到
+     内容高度以下，那样卡片还是会被撑高，锁定高度就失效了。 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 内容确实超出时才启用省略号与裁剪。
+   正常情况（内容放得下）不加这个类，避免给每张卡都挂上 -webkit-line-clamp
+   带来的额外排版开销与潜在的高度抖动。 */
+.wordcard.is-overflow .word {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.wordcard.is-overflow .example {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.word-tools { flex: none; }
+
+/* 这一块的上下留白全部由内部元素自己的 margin 决定，容器不加 padding-bottom。
+   原来底部有 6px，是给「提问态」当过渡留白用的（当时它下面直接接答案区）。
+   现在词性胶囊常驻在末尾，那 6px 就变成**白占的额外间隙** ——
+   上间距 10px、下间距却成了 6+10+16=32px，肉眼就是「词性离下面的单词太远」。
+   把间距统一交给 .word-pos 的 margin，上下才可能真正对称。 */
+.meaning-wrap { padding: clamp(20px, 4vw, 32px) 0 0; text-align: center; }
+/* 「中文意思」这个标签原本自己加了 1px 字距 —— 那不在 M3 标度上，
+   是「想让它看起来像个小标题」临时调出来的数。回到 Label Medium 的 0.5px：
+   和大写字母不同，中文标签本来就不靠拉开字距来分层。 */
+.meaning-label {
+  margin: 0 0 12px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-surface-variant);
+}
+.meaning {
+  margin: 0;
+  font: var(--md-display-s);
+  font-size: clamp(28px, 5vw, 42px);
+  line-height: 1.4;
+  color: var(--md-on-surface);
+  /* 小工具级过渡走 Standard Decelerate；Emphasized 那条留给「承担重量」的
+     位移（页面切换、卡片入场），用在这里会显得比实际动作更重。 */
+  animation: meaning-in var(--md-dur-long) var(--md-ease-standard-decelerate) both;
+}
+@keyframes meaning-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+/* 词性：跟在「中文意思」下面，**始终可见** —— 提问时是提示（知道是 n. 还是
+   adj. 往往就能想起词义），揭示后是补充说明，两个阶段都该在。
+   刻意做得比中文意思弱一档，不抢视线。
+   用 --md-shape-full 的小胶囊，和 HUD 里那枚进度百分比同一套语言。
+
+   上下 margin 都取 10px，让「中文意思 ↔ 词性」和「词性 ↔ 揭示的单词」
+   两段间距相等。这里要注意：胶囊和 .answer 分属 .meaning-wrap / .answer
+   两个盒子，而 .card-body 是 flex 容器 —— **flex 子项之间不发生外边距折叠**，
+   间距是直接相加的。所以下间距只有两处都为 0 时，胶囊这 10px 才等于实际间隙：
+     · .meaning-wrap 的 padding-bottom 已改成 0（见上）；
+     · .answer 的 margin-top 也改成 0（见下）。 */
+.word-pos {
+  display: inline-block;
+  margin: 10px 0;
+  padding: 2px 10px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-container-high);
+  border-radius: var(--md-shape-full);
+}
+/* 没有词性的词条整行撤掉。这里用 hidden 是安全的：
+   它不参与「揭示前后卡片被压缩比例变化」那套计算 —— 两态都在，
+   元素从布局里出现/消失只发生在**翻到另一张卡**的时候，
+   而那时卡片本来就要整体重排。 */
+.word-pos[hidden] { display: none; }
+
+.answer {
+  /* 上下留白全部归零：词性胶囊上下那对 margin 是「译 ↔ 词性 ↔ 单词」
+     两段间距的**唯一**来源，这样两段才可能严格相等。
+     这里踩过一次坑：.answer 有 flex:1 1 auto，会**填满**卡片剩余高度，
+     所以它的 padding-top 不会被布局吸收掉，而是实打实地把单词往下推 ——
+     只把 margin-top 归零时，下间距仍然多出这个 padding-top（实测 26px vs 10px）。
+     padding-top 保留是给 .answer 内部当呼吸量的，既然间距由外面统一管，
+     这里就不再需要。 */
+  margin-top: 0;
+  padding-top: 0;
+  text-align: center;
+  border: none;
+}
+/* 答案词：M3 的展示字形，改用主色而非朱红。
+   原来它下面还有一行「本轮第 N 次考到」（.word-sub）和一个 .answer-rule
+   分隔线，两者都已去掉：
+     · 轮次信息在揭示后是多余的（HUD 上已有「N 次重考」，卡片右上角也有
+       「重考 N 次」角标），去掉后发音控件和例句直接跟住单词，版面更紧凑；
+     · 分隔线的 <svg> 早就 display:none 了，是纯死代码。 */
+.word {
+  margin: 0;
+  font: var(--md-display-s);
+  font-size: clamp(30px, 5.4vw, 44px);
+  line-height: 1.25;
+  color: var(--md-primary);
+  word-break: break-word;
+}
+.word span { display: inline-block; animation: letter-up var(--md-dur-medium) var(--md-ease-emphasized) both; }
+@keyframes letter-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.example {
+  margin: 14px auto 0;
+  max-width: 52ch;
+  font: var(--md-body-m);
+  line-height: 1.7;
+  color: var(--md-on-surface-variant);
+  animation: fade-up var(--md-dur-long) var(--md-ease-standard-decelerate) .15s both;
+}
+.example:empty { display: none; }
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 发音按钮：无描边的色调纸片（原来那圈实线描边已去掉） */
+.word-tools {
+  display: flex;
+  justify-content: center;
+  /* 两个按钮（发音 / 完整内容）并排时的间距 */
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  animation: fade-up var(--md-dur-long) var(--md-ease-decelerate) .2s both;
+}
+.speak-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 18px 8px 14px;
+  font: var(--md-label-l);
+  color: var(--md-primary);
+  background: var(--md-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              color var(--md-dur-short) var(--md-ease-standard);
+}
+.speak-btn:hover { background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface-container-high)); }
+.speak-btn:active { background: color-mix(in srgb, var(--md-primary) 16%, var(--md-surface-container-high)); }
+.speak-btn:disabled { color: color-mix(in srgb, var(--md-on-surface) 38%, transparent); background: color-mix(in srgb, var(--md-on-surface) 12%, transparent); }
+.speak-ico { width: 18px; height: 18px; flex: none; }
+.speak-wave { opacity: .5; }
+.speak-btn.is-speaking {
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+}
+.speak-btn.is-speaking .speak-wave { animation: speak-wave 1.05s var(--md-ease-standard) infinite; }
+.speak-btn.is-speaking .speak-wave + .speak-wave { animation-delay: .16s; }
+@keyframes speak-wave {
+  0%, 100% { opacity: .3; }
+  50% { opacity: 1; }
+}
+
+/* 作答反馈：原来的斜盖印章 → M3 的圆角状态容器 */
+.stamp {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 6px 14px;
+  font: var(--md-label-l);
+  color: var(--md-on-success-container);
+  background: var(--md-success-container);
+  border: none;
+  border-radius: var(--md-shape-s);
+  animation: stamp-in var(--md-dur-medium) var(--md-ease-spring) .1s both;
+}
+.stamp.is-miss { color: var(--md-on-error-container); background: var(--md-error-container); }
+@keyframes stamp-in {
+  0% { opacity: 0; transform: scale(.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---- 4.7 作答按钮 ---- */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  animation: fade-up var(--md-dur-medium) var(--md-ease-standard-decelerate) both;
+}
+/* 「记得」＝ 主操作（填充）；「不记得」＝ error 角色的色调按钮。
+   两个都不带描边：一个靠实心主色，一个靠 error 色调面，对比足够。
+
+   尺寸：**固定宽 155px**（=.btn.large 的 min-height 48px + 内容+内边距的天然宽度）。
+   这两对按钮（作答 / 下一个）是轮流出现在同一个位置的，宽度不一致切换时会跳。
+   为什么不用 padding 去凑：四个按钮的内边距本来就一样（.btn.large 的 32px，
+   撤销那条单独写 24px），宽度差只来自文字长度 ——「不记得」3 字 140px、
+   「记得」2 字 126px、「下一个」3 字 155px。所以直接给统一的固定宽度最省事，
+   也不用为每个标签算一次 padding。
+   不用 min-width 而用 width：min-width 遇到更长的文案仍会撑开，
+   那就回到「宽度不一致」的老问题了。 */
+.btn.yes,
+.btn.no {
+  flex: 0 0 auto;
+  width: 155px;
+  min-width: 0;
+}
+.btn.yes {
+  color: var(--md-on-primary);
+  background: var(--md-primary);
+}
+.btn.yes::after { background: var(--md-on-primary); }
+.btn.no {
+  min-width: 0;
+  color: var(--md-error);
+  background: color-mix(in srgb, var(--md-error) 10%, var(--md-surface-container-high));
+}
+.btn.no:hover { background: color-mix(in srgb, var(--md-error) 18%, var(--md-surface-container-high)); }
+
+/* 「撤销」也统一成 155px：它原本靠 24px 内边距收窄到 112px，
+   但这两对按钮轮流出现在同一个位置，「下一个」是 155、「撤销」是 112，
+   按下去/切到下一步时右边会对不齐。四个都 155 之后版面最稳。 */
+.controls .btn.step-undo { width: 155px; padding: 13px 24px; }
+.controls .btn.step-undo kbd { margin-left: 8px; }
+
+.study-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+.study-foot .kbd-tip { font: var(--md-body-s); color: var(--md-on-surface-variant); }
+.study-foot .kbd-tip b {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 1px;
+  font: var(--md-label-s);
+  font-family: var(--md-font-mono);
+  color: var(--md-on-surface);
+  border: none;
+  border-radius: var(--md-shape-xs);
+  background: var(--md-surface-container-high);
+}
+
+/* ---- 4.8 成绩单 ---- */
+.report {
+  position: relative;
+  overflow: hidden;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 40px);
+  background: var(--md-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-l-increased);
+  box-shadow: var(--md-elev-1);
+}
+/* 原来的斜角红章 → 右上角的成功色纸片 */
+.report::after {
+  content: "已完成";
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 6px 14px;
+  font: var(--md-label-l);
+  color: var(--md-on-success-container);
+  background: var(--md-success-container);
+  border: none;
+  border-radius: var(--md-shape-s);
+  transform: none;
+  opacity: 1;
+}
+/* 报告页的小标题：M3 的 Label Medium（字距 0.5px，不再是随手写的 .4px） */
+.report-kicker { margin: 0 0 6px; font: var(--md-label-m); letter-spacing: var(--md-track-label-m); color: var(--md-on-surface-variant); }
+.report-head h2 { margin: 0 0 8px; font: var(--md-headline-s); color: var(--md-on-surface); }
+.report-head .muted { margin: 0; font: var(--md-body-s); line-height: 1.7; }
+.report-head .done-books { margin-top: 6px; font: var(--md-body-s); color: var(--md-on-surface-variant); }
+.report-head .done-review { margin-top: 6px; font: var(--md-body-s); line-height: 1.8; color: var(--md-primary); }
+
+.score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  margin: 28px 0;
+  background: none;
+  border: none;
+}
+.score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 20px;
+  background: var(--md-surface-container);
+  /* 统计小卡：M3 里这类「卡片」用 corner-medium(12) */
+  border-radius: var(--md-shape-card);
+}
+.score-num {
+  font: var(--md-headline-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--md-on-surface);
+  line-height: 1.1;
+}
+.score-label { font: var(--md-label-m); letter-spacing: var(--md-track-label-m); color: var(--md-on-surface-variant); }
+
+.report-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px; }
+.report-col h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  font: var(--md-title-s);
+  border: none;
+}
+.wordlist { list-style: none; margin: 0; padding: 0; max-height: 268px; overflow: auto; }
+.wordlist li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--md-shape-s);
+}
+.wordlist li:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.wordlist .wl-en { font: var(--md-title-s); letter-spacing: var(--md-track-title-s); color: var(--md-on-surface); }
+.wordlist .wl-cn { font: var(--md-body-s); color: var(--md-on-surface-variant); }
+.wordlist .wl-times { font: var(--md-label-s); color: var(--md-error); white-space: nowrap; }
+.muted-list .wl-en { color: var(--md-on-surface-variant); }
+.wordlist .empty { justify-content: flex-start; padding: 12px 10px; font: var(--md-body-s); color: var(--md-on-surface-variant); }
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border: none;
+}
+
+/* ---- 4.9 编辑弹层的查重面板 ---- */
+.cf-panel {
+  padding: 16px 18px 12px;
+  background: var(--md-error-container);
+  border: none;
+  border-radius: var(--md-shape-m);
+}
+.cf-tip { margin: 0 0 14px; font: var(--md-body-s); line-height: 1.75; color: var(--md-on-error-container); }
+.cf-tip b { color: var(--md-on-error-container); font-weight: 600; }
+/* 冲突分组之间用一条极淡的线分开。
+   这是「描边」的例外：它不是容器的边框，而是**列表项之间的分隔**，
+   去掉之后相邻两组会糊成一片。把浓度压到 20% 已经很接近看不见，
+   但分组关系仍然读得出来。 */
+.cf-group { padding: 12px 0 8px; border-top: 1px solid color-mix(in srgb, var(--md-on-error-container) 20%, transparent); }
+.cf-group:first-child { padding-top: 0; border-top: 0; }
+.cf-group-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.cf-kind {
+  flex: none;
+  padding: 4px 10px;
+  font: var(--md-label-s);
+  color: var(--md-on-error);
+  background: var(--md-error);
+  border: none;
+  border-radius: var(--md-shape-s);
+}
+.cf-desc { font: var(--md-body-s); line-height: 1.6; color: var(--md-on-error-container); }
+.cf-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.cf-line { font: var(--md-label-s); color: var(--md-on-error-container); opacity: .8; }
+.cf-row.is-odd .cf-line { opacity: 1; font-weight: 600; }
+.cf-input {
+  min-height: 40px;
+  padding: 8px 12px;
+  font: var(--md-body-m);
+  background: var(--md-surface-container-high);
+  border: none;
+  border-bottom: 1px solid var(--md-outline);
+  border-radius: var(--md-shape-field) var(--md-shape-field) 0 0;
+}
+/* 「这格对不上」的提示：不画红框，改用 error 色调底 + 加粗的指示线 */
+.cf-input.is-odd {
+  background: color-mix(in srgb, var(--md-error) 14%, var(--md-surface-container-high));
+  border-bottom: 2px solid var(--md-error);
+}
+
+/* ---- 4.10 学习统计 ----
+   顶部三层竖排：大字 → 小字 → 「清空统计」按钮。
+   按钮为什么放在小字**下面**而不是和大字同一行：
+   大字现在跟主页同步成 40~60px，在窄屏上「大字 + 按钮」刚好差几像素放不下，
+   按钮会被挤到第二行、夹在大字和小字中间，看着像把两行文字切开了。
+   竖排之后顺序固定、任何宽度都不会变形，也不用再为挤压做妥协。 */
+.stats-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;   /* 按钮按内容宽度，不被拉伸 */
+  gap: 10px;
+  margin-bottom: 24px;
+}
+/* 没有内容时不要留出空白（app.js 在某些状态下会把这句话清空） */
+.stats-head .muted:empty { display: none; }
+/* 按钮和上面那行小字之间再松一点，避免看着像小字的一部分 */
+.stats-head .reset-stats { margin-top: 4px; }
+/* 统计页标题：**与词书库页首（.brand-text）同一套字号**。
+   原来是 Headline Small(24px)，比主页的大字小一大截，两个页面切来切去
+   标题忽大忽小。这里直接复用 .brand-text 那两条的取值：
+   大字 clamp(40px,11vw,60px) + 小字 --md-body-m。
+   字重也跟主页一致用 500（Headline Small 默认 400 会显得比主页细）。 */
+.stats-head h2 {
+  margin: 0;
+  font: var(--md-display-s);
+  font-weight: 500;
+  font-size: clamp(40px, 11vw, 60px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.stats-head .muted {
+  margin: 0;
+  max-width: 68ch;
+  font: var(--md-body-m);
+  letter-spacing: var(--md-track-body-m);
+  line-height: 1.75;
+  color: var(--md-on-surface-variant);
+}
+/* 没有内容时不要留出空白（app.js 在某些状态下会把这句话清空） */
+.stats-head .muted:empty { display: none; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+  background: none;
+  border: none;
+}
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--md-surface-container);
+  border-radius: var(--md-shape-card);
+}
+.stat-num {
+  font: var(--md-headline-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--md-on-surface);
+}
+.stat-num i { margin-left: 2px; font: var(--md-body-s); letter-spacing: var(--md-track-body-s); font-style: normal; color: var(--md-on-surface-variant); }
+.stat-num.is-jade { color: var(--md-success); }
+.stat-num.is-red { color: var(--md-error); }
+.stat-label { font: var(--md-label-m); letter-spacing: var(--md-track-label-m); color: var(--md-on-surface-variant); }
+
+.panel {
+  margin-bottom: 24px;
+  padding: clamp(18px, 2.6vw, 24px);
+  background: var(--md-surface-container-low);
+  border: none;
+  border-radius: var(--md-shape-l);
+}
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.panel-head h3 { display: flex; align-items: center; gap: 10px; margin: 0; font: var(--md-title-m); letter-spacing: var(--md-track-title-m); }
+.panel-head .muted { margin: 0; font: var(--md-body-s); letter-spacing: var(--md-track-body-s); }
+
+/* 热力图 */
+.heat-scroll { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+/* display:flex 不能省：.heat 里是「星期标签列 + 主体」两个横向并排的块，
+   下面 .heat-weekdays / .heat-main 都按 flex 子项写了 flex:none。
+   漏掉这一条会退回 display:block，两块竖着叠起来 —— 星期标签被顶到网格上方，
+   min-width:max-content 又让网格撑出容器，整块布局就散了。 */
+.heat { display: flex; gap: 0; min-width: max-content; --cell: 12px; }
+.heat-weekdays {
+  flex: none;
+  display: grid;
+  grid-template-rows: repeat(7, var(--cell));
+  gap: 3px;
+  padding-top: 17px;
+}
+.heat-weekdays span {
+  font: var(--md-label-s);
+  font-size: 10px;
+  line-height: var(--cell);
+  color: var(--md-on-surface-variant);
+  text-align: right;
+}
+/* .heat 上的 gap 会一并作用到月份这一行（它也是 flex 子项里的 grid），
+   把 3px 的格子间距撑到 8px，月份就对不上各自的列了 —— 所以 gap 归零，
+   「星期标签 ↔ 主体」之间改用 .heat-main 的 margin-left 撑开。 */
+.heat-main { flex: none; margin-left: 8px; }
+/* 月份行：一列只有 12px 宽，而「10 月」要 26px 才排得下。
+   关键在于 app.js 写的是 grid-column: N —— 这是「从第 N 条轨道起」，
+   格子宽度仍只有一条轨道（12px），文字必然溢到相邻列上叠字。
+   解法：把月份行铺成与下面格子完全相同的轨道
+   （53 列 × 12px，间距 3px）。这样 grid-column: N 就精确落在
+   那个月第一格的正上方；相邻月份之间有 4~5 列（60px 以上）的余量，
+   「10 月」的 26px 文字自然放得下，不会再压到下一个标签。 */
+.heat-months {
+  display: grid;
+  grid-template-columns: repeat(53, 12px);
+  gap: 3px;
+  /* 两行位置：默认所有标签排上面一行，隔一个的落到下面一行，
+     这样跨年时（9 月与 10 月只隔一列）两个标签也不会叠在一起。 */
+  grid-template-rows: repeat(2, 14px);
+  height: 28px;
+  margin-bottom: 3px;
+}
+.heat-month {
+  grid-row: 1;
+  font: var(--md-label-s);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--md-on-surface-variant);
+  white-space: nowrap;
+}
+/* 隔一个标签下移一行：跨年那对（列号只差 1）就错开了。
+   月份数量是 12，隔行后同一行里相邻标签至少隔 2 个标签，
+   而一年里没有两个月份标签会挨得比 4 列更近，够用。 */
+.heat-month:nth-child(2n) { grid-row: 2; }
+.heat-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, var(--cell)); gap: 3px; }
+.heat-cell {
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--heat-0);
+  /* 这一圈「描边」是**必须**的，不是装饰：
+     --heat-0 取的是 surface-container-high，而「最近一年」弹窗的底色是
+     surface-container —— 实测这两个值算出来**完全相同**
+     （color(srgb .15549 .180392 .227059)），于是整年网格在弹窗里变成一块
+     纯色，格子全看不见（截图上只剩月份和星期标签）。
+     用一圈更暗的同色描边把每格勾出来，这样无论落在哪种 surface 上都有边界。
+     用 outline 而不是 border：border 会参与盒模型，格子尺寸会从 --cell 变成
+     --cell+2，列数和宽度全要重算；outline 不影响布局。 */
+  outline: 1px solid color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  outline-offset: -1px;
+  transition: outline-color var(--md-dur-short) var(--md-ease-standard);
+}
+.heat-cell.lv0 { background: var(--heat-0); }
+.heat-cell.lv1 { background: var(--heat-1); }
+.heat-cell.lv2 { background: var(--heat-2); }
+.heat-cell.lv3 { background: var(--heat-3); }
+.heat-cell.lv4 { background: var(--heat-4); }
+/* 空格子（补满最后一列的占位）不画：它本来就不代表任何一天，
+   画出来会让右边多出一片「假格子」。 */
+.heat-cell.is-void { background: transparent; outline: none; }
+.heat-cell.is-today { outline: 2px solid var(--md-primary); outline-offset: 1px; }
+.heat-grid .heat-cell { cursor: default; }
+.heat-grid .heat-cell:not(.is-void):hover { outline: 2px solid var(--md-on-surface); outline-offset: 1px; }
+.heat-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border: none;
+}
+.heat-foot .muted { font: var(--md-body-s); }
+.heat-legend { display: inline-flex; align-items: center; gap: 4px; }
+.heat-legend .heat-cell { display: inline-block; width: 12px; height: 12px; }
+/* 图例里第一格是 lv0，在弹窗底色上同样会「消失」，
+   所以图例的小格子也保留那圈描边（上面的 is-void 规则不影响它） */
+.heat-legend .heat-cell.lv0 { outline: 1px solid color-mix(in srgb, var(--md-on-surface) 10%, transparent); outline-offset: -1px; }
+.heat-legend .muted { font: var(--md-label-s); }
+
+.heat-tip {
+  position: fixed;
+  z-index: 1300;
+  max-width: 260px;
+  padding: 10px 14px;
+  font: var(--md-body-s);
+  line-height: 1.7;
+  color: var(--md-inverse-on-surface);
+  background: var(--md-inverse-surface);
+  border-radius: var(--md-shape-s);
+  box-shadow: var(--md-elev-2);
+  pointer-events: none;
+}
+.heat-tip b { color: var(--md-inverse-on-surface); font-weight: 600; }
+.heat-tip .tip-dim { color: color-mix(in srgb, var(--md-inverse-on-surface) 70%, transparent); }
+
+/* 趋势柱：M3 的圆角柱 + 主色 */
+.trend { display: flex; align-items: stretch; gap: clamp(4px, 1vw, 10px); height: 152px; }
+.trend-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.trend-val { flex: none; height: 14px; font: var(--md-label-m); font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); }
+.trend-bar-wrap { flex: 1 1 auto; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.trend-bar {
+  width: 68%;
+  min-height: 3px;
+  background: var(--md-primary);
+  border-radius: var(--md-shape-xs) var(--md-shape-xs) 0 0;
+  transition: height var(--md-dur-long) var(--md-ease-emphasized);
+}
+.trend-bar.is-zero { background: var(--md-surface-variant); }
+.trend-day { flex: none; font: var(--md-label-s); color: var(--md-on-surface-variant); white-space: nowrap; }
+.trend-col.is-today .trend-day,
+.trend-col.is-today .trend-val { color: var(--md-primary); font-weight: 600; }
+
+/* ---- 趋势面板：整块可点，打开 14 天的弹窗 ----
+   HTML 里这块是 <button>，浏览器会给它一身的默认样式（灰底、居中、
+   border、系统字体、min-width），所以要逐条按掉。不用 all:unset ——
+   那条会把 display / padding 之类也一起清掉，反而要再补回来；
+   逐条覆盖更清楚自己到底改了哪几样。 */
+.trend-panel {
+  display: block;
+  width: 100%;
+  /* 面板本体样式沿用 .panel（含 padding 与 border-radius），
+     这里只把它从「div 的默认」拉回按钮该有的样子 */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  /* 圆角裁切：hover / 按下时整块换底色，四个角要跟着面板圆角走 */
+  overflow: hidden;
+  border-radius: var(--md-shape-l);
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              box-shadow var(--md-dur-short) var(--md-ease-standard);
+}
+/* 可点提示：hover 时边框提到主色 + 抬一级高度（和 .btn.primary:hover 同语言） */
+.trend-panel:hover {
+  box-shadow: var(--md-elev-2);
+}
+.trend-panel:active { background: var(--md-surface-container); }
+/* 面板内的文字继承按钮的排版，标题用 Title Medium（和 .panel-head h3 一致） */
+.trend-panel .panel-head { margin-bottom: 12px; align-items: center; }
+.trend-panel .panel-title { font: var(--md-title-m); letter-spacing: var(--md-track-title-m); }
+/* 说明文字占满中间，把「看 14 天」推到右端；
+   gap 给一点，免得窄屏上说明文字紧贴箭头 */
+.trend-panel .panel-head .muted { flex: 1 1 auto; margin-right: 8px; }
+
+/* 末端箭头 + 「看 14 天」：M3 里「可进入下一层」的惯用提示。
+   箭头随 hover 右移 2px —— 位移用强调曲线，和底栏图标缩放同一档。 */
+.trend-more {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-primary);
+  white-space: nowrap;
+}
+.trend-more svg {
+  width: 16px;
+  height: 16px;
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.trend-panel:hover .trend-more svg { transform: translateX(2px); }
+
+/* 「看一年」做成真正的 <button>（热力图那处用它），所以要把浏览器的
+   按钮默认外观压掉。另外它不在 .trend-panel 里，hover 位移要自己写一条。 */
+.heat-more {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.heat-more:hover svg { transform: translateX(2px); }
+.heat-more:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 2px; }
+
+/* 热力图弹窗外框：只有这里才需要宽度约束。
+   正文里那个 .heat-scroll 不能加 max-width —— .modal-box 宽度是 auto，
+   给它设成 100% 会把 .modal-box 撑到视口宽，弹窗就不像弹窗了；
+   所以按内容收缩（max-width:100%），超宽由 overflow-x 兜住。 */
+.heat-scroll-modal {
+  max-width: 100%;
+  padding-bottom: 8px;
+}
+
+/* ---- 14 天弹窗里的图 ----
+   14 天每天占固定宽度，容器不够宽就横向滚动。
+   为什么不让柱子自己缩窄去挤：面板里 7 天每天约 60px，14 天平分只剩约 30px，
+   缩到那个程度柱子细得像刻度线，反而看不清。宁可溢出 + 滑动。 */
+.trend-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  /* 触摸端滑动手感：iOS / 安卓 WebView 上的惯性滚动 */
+  -webkit-overflow-scrolling: touch;
+}
+/* 14 天固定成每天 34px：34×14 + 13 个约 10px 的间距 ≈ 606px，
+   比弹窗内容宽（620 - 左右内边距 ≈ 556px），于是自然溢出、可以左右滑。
+   宽度用 flex-basis 定死而不是让它 flex:1 平分：
+   平分的话 14 天只会越挤越窄、永远不会溢出，也就永远滑不动。 */
+.trend.is-wide { min-width: max-content; }
+.trend.is-wide .trend-col { flex: 0 0 34px; }
+/* 原来这里有一条 `.modal-box > p.trend-hint`，给「左右滑动查看更多」那句
+   提示排版。滑动指示条已全部去掉（HTML 里的 #trendHint / #heatHint 也删了），
+   这条样式随之移除。 */
+
+/* 词书掌握度 / 疑难词 */
+.stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.mastery-list { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+.mastery-item { padding: 12px 10px; border-radius: var(--md-shape-s); }
+.mastery-item:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.mastery-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mastery-name {
+  font: var(--md-title-s);
+  letter-spacing: var(--md-track-title-s);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mastery-num { flex: none; font: var(--md-label-m); color: var(--md-on-surface-variant); white-space: nowrap; }
+.mastery-cov { color: var(--md-primary); font-weight: 600; }
+.mastery-bar {
+  margin-top: 8px;
+  height: 4px;
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-full);
+  overflow: hidden;
+}
+.mastery-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--md-primary);
+  border-radius: var(--md-shape-full);
+  transition: width var(--md-dur-long) var(--md-ease-emphasized);
+}
+.mastery-item.is-empty .mastery-bar span { background: var(--md-outline-variant); }
+.mastery-empty { padding: 16px 10px; font: var(--md-body-s); color: var(--md-on-surface-variant); }
+
+/* 数据备份 / 发音引擎两块的说明都偏长，标题与说明改成上下排 */
+.backup-panel .panel-head,
+.speak-panel .panel-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.backup-panel .panel-head .muted,
+.speak-panel .panel-head .muted { line-height: 1.75; max-width: 72ch; }
+
+/* ---- 安卓壳子：不需要「发音引擎」选择模块 ----
+   安卓版只走系统 TTS（原生桥接），APK 里也没打进 Piper 内置语音包，
+   所以「自动选择 / 网页内置语音 / 本机内置语音」这三档没有任何可选性，
+   整块面板在 APK 里直接隐藏。
+
+   html.android-shell 由 assets/nav-bridge.js 打上，且只在真正探测到原生桥接
+   对象（TtsBridge.isAndroidShell()）时才加 —— 网页版在安卓手机浏览器里打开
+   不会带这个类，模块照旧显示。
+
+   只隐藏不动 DOM：app.js 里 renderSpeakEngine() 一开头就有
+   `if (!el.speakEngineHint) return`，留空判断是齐的，删掉节点也不会报错；
+   但 HTML 是网页版与安卓版共用的一份，删了网页版就没有了，所以这里用 CSS。 */
+html.android-shell .speak-panel { display: none; }
+
+/* 这里曾有一组 .shell-only / html.android-shell .shell-only 规则，
+   用来让「显示状态栏」开关只在 APK 里出现。开关已移除（状态栏改为常驻显示），
+   规则一并删掉。将来若再加安卓专有控件，可以照这个思路重写：
+
+     .shell-only { display: none; }
+     html.android-shell .shell-only { display: block; }
+
+   注意 nav-bridge.js 是等 MutationObserver 回调才打上 android-shell 类的，
+   比样式表晚一拍，直接 display 切换会在首帧闪一下；当时是靠一个 0.01ms 的
+   动画把首帧压过去的。 */
+/* 信息提示块：原来是「灰底 + 左侧 4px 主色竖条」，
+   竖条本质上也是一条描边，去掉后改用主色色调底 ——
+   底色本身就能说明这块是提示，不必再画一条线。 */
+.backup-summary {
+  margin: 0;
+  padding: 12px 16px;
+  font: var(--md-body-s);
+  line-height: 1.75;
+  color: var(--md-on-surface);
+  background: color-mix(in srgb, var(--md-primary) 10%, var(--md-surface-container-high));
+  border: none;
+  border-radius: var(--md-shape-s);
+}
+.backup-summary:empty { display: none; }
+.backup-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.backup-tip { font: var(--md-body-s); }
+
+.speak-choices { display: flex; flex-direction: column; gap: 2px; }
+.speak-choices .checkline { align-items: flex-start; padding: 8px 10px; border-radius: var(--md-shape-s); }
+.speak-choices .checkline:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.speak-choices .checkline input { margin-top: 2px; }
+.speak-choices .checkline span { display: flex; flex-direction: column; gap: 2px; }
+.speak-choices .checkline small { font: var(--md-body-s); color: var(--md-on-surface-variant); line-height: 1.6; }
+.speak-choices .checkline input:checked ~ span > :first-child { font-weight: 600; }
+/* 发音引擎状态块：同样去掉左侧竖条，改成成功 / 错误色调底。
+   .is-warn 那条以前只改竖条颜色，现在要连底色一起换。 */
+.speak-status {
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  font: var(--md-body-s);
+  line-height: 1.75;
+  color: var(--md-on-surface);
+  background: color-mix(in srgb, var(--md-success) 12%, var(--md-surface-container-high));
+  border: none;
+  border-radius: var(--md-shape-s);
+}
+.speak-status.is-warn { background: color-mix(in srgb, var(--md-error) 12%, var(--md-surface-container-high)); }
+.speak-status:empty { display: none; }
+.speak-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+
+/* ---- 自定义模块（头像 / 用户名称 / 个性签名） ---- */
+.profile-panel .panel-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.profile-panel .panel-head .muted { line-height: 1.75; max-width: 72ch; }
+.profile-body {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(18px, 3vw, 32px);
+  flex-wrap: wrap;
+}
+.profile-avatar-col {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 168px;
+}
+/* 表单里的大号当前头像 */
+.avatar-current {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  font: var(--md-headline-s);
+  font-size: 34px;
+  color: var(--md-on-primary-container);
+  /* 纯色容器底（原来是 primary→tertiary 渐变）。
+     全站的渐变都去掉了，这个大头像也跟着拉平 ——
+     它和词书库横幅现在用的是同一块色，两处看起来是同一个品牌区。 */
+  background: var(--md-primary-container);
+  border-radius: var(--md-shape-full);
+  /* 同一套中性投影（见 1.5b）。这里也一并改掉，否则统计页那个「当前头像」
+     还会跟着主题变色，和主页那个看起来不像同一套东西。 */
+  box-shadow: var(--md-avatar-shadow);
+}
+.avatar-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* 预设字符头像 */
+.avatar-presets { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* 预设头像：选中态用主色容器底 + 主色文字，不用描边 */
+.avatar-preset {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font: var(--md-title-s);
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              color var(--md-dur-short) var(--md-ease-standard);
+}
+.avatar-preset:hover { background: var(--md-surface-container-highest); color: var(--md-on-surface); }
+.avatar-preset.is-on {
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+}
+.profile-fields { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.profile-fields input[type="text"] { max-width: 420px; }
+.profile-tip { margin: 0; font: var(--md-body-s); }
+
+/* 主题色：一排圆形色板。
+   每个色板由 profile.js 把主题色写进 --sw 上色。
+   选中态**不画外圈描边**（去描边体系），改成：
+     · 色块自身缩小一圈（::before 的 inset 变大）留出间隙，
+     · 间隙里透出底色，视觉上等价于一圈「同色环」，
+     · 再叠一个白色对勾。
+   这样选中的那两个特征（环 + 勾）都保留了，但没有用到 border。 */
+.theme-field { display: flex; flex-direction: column; gap: 10px; }
+.theme-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.theme-swatch {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+}
+/* 色块本体 */
+.theme-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: var(--md-shape-full);
+  background: var(--sw, var(--md-primary));
+  transition: inset var(--md-dur-short) var(--md-ease-standard);
+}
+.theme-swatch:hover::before { inset: 5px; }
+/* 选中：色块缩到 6px 内缩，外圈那 6px 就成了「同色环」的观感 */
+.theme-swatch.is-on::before { inset: 6px; }
+/* 选中打勾：**一律白色**。
+   这里原来有一条 `[data-theme-name="default"] { color: var(--md-on-primary-container) }`
+   的例外，本意是「默认那档是浅蓝底，用深色勾更清楚」——
+   但实际效果是七个色块里只有蓝色的勾是深色的，反而只有它看不清
+   （白色勾 + 一点点投影在浅蓝上比深蓝勾更醒目）。
+   所以例外整条去掉，统一走上面的白色 + text-shadow。 */
+.theme-swatch.is-on::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+.theme-swatch:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 2px; }
+
+/* ---- 外观模式滑块（跟随系统 / 亮色 / 暗色） ----
+   复用 .switch 那套「轨道 + 圆钮」的语汇，但放大成三个等宽档位：
+     · 轨道 = surface-container-highest 实心底（无描边，与全站一致）
+     · 圆钮 = 一个 absolute 的 .mode-thumb，靠 translateX 在三档间滑动
+     · 选中档位由容器的 data-mode 决定，JS 只改这一个属性
+   为什么不用原生 <input type=range>：它没有「三档等宽 + 文字标签」的形态，
+   样式上也几乎没法跨浏览器统一。 */
+.mode-slider {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* 内边距 = 圆钮四周的留白，圆钮尺寸由下面的 inset 推出 */
+  padding: 4px;
+  background: var(--md-surface-container-highest);
+  border-radius: var(--md-shape-full);
+  isolation: isolate;
+}
+/* 滑块圆钮：宽 = 一档的宽度，高 = 轨道高 − 上下 padding。
+   用 calc 从容器尺寸推出来，所以三档文字变长变短都不用改这里。 */
+.mode-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  background: var(--md-primary);
+  border-radius: var(--md-shape-full);
+  /* 位移用强调曲线：这是「承担重量」的位移，和底栏图标、开关圆钮同一档 */
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized);
+  z-index: 0;
+}
+.mode-slider[data-mode="auto"] .mode-thumb { transform: translateX(0); }
+.mode-slider[data-mode="light"] .mode-thumb { transform: translateX(100%); }
+.mode-slider[data-mode="dark"] .mode-thumb { transform: translateX(200%); }
+
+.mode-opt {
+  position: relative;
+  z-index: 1;               /* 压在圆钮之上，文字才不会被盖住 */
+  padding: 9px 6px;
+  font: var(--md-label-l);
+  letter-spacing: var(--md-track-label-l);
+  color: var(--md-on-surface-variant);
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--md-dur-medium) var(--md-ease-standard);
+}
+.mode-opt:hover { color: var(--md-on-surface); }
+/* 选中档：文字换成 on-primary（圆钮底色是 primary，深色主题下自动反过来） */
+.mode-slider[data-mode="auto"] .mode-opt[data-scheme="auto"],
+.mode-slider[data-mode="light"] .mode-opt[data-scheme="light"],
+.mode-slider[data-mode="dark"] .mode-opt[data-scheme="dark"] {
+  color: var(--md-on-primary);
+}
+.mode-opt:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 3px; }
+
+@media (max-width: 720px) {
+  .profile-avatar-col { width: 100%; }
+  .profile-fields input[type="text"] { max-width: none; }
+}
+
+/* ============================================================
+   5. 弹层与提示
+   ============================================================ */
+
+/* ---- 5.1 对话框：M3 的 28dp 圆角、无描边、靠高度分层 ---- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--md-scrim) 45%, transparent);
+  animation: scrim-in var(--md-dur-medium) var(--md-ease-standard) both;
+}
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+.modal-box {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 28px clamp(20px, 4vw, 32px);
+  background: var(--md-surface-container-high);
+  border: none;
+  /* 对话框形状：M3 规定 extra-large(28)。这里改用语义别名 --md-shape-sheet，
+     免得以后再看到 --md-shape-xl 还要回头查它到底是哪一档。 */
+  border-radius: var(--md-shape-sheet);
+  box-shadow: var(--md-elev-3);
+  animation: dialog-in var(--md-dur-long) var(--md-ease-decelerate) both;
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(16px) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+/* 对话框标题：M3 规定用 Headline Small。早先这里把它压到 22px
+   （比 Headline Small 的 24px 小一档，又比 Body Large 大），
+   属于「为了塞进弹窗自己造的一档」。宽度不够靠换行解决，
+   不靠缩字号 —— 弹窗宽度是 min(620px, 100%)，24px 标题排得下。 */
+.modal-box h2 { margin: 0 0 16px; font: var(--md-headline-s); }
+
+/* 量溢出时的「测量模式」：把所有动画位移归零。
+   为什么需要它：答案词的每个字母是一个 .word span，带 letter-up 动画，
+   起始帧是 translateY(10px)。检测若在动画跑完前进行，
+   scrollHeight 会把这 10px 位移算进去 —— 实测「significant」这种
+   明明放得下的卡也被判成溢出（nat=183 vs avail=177），
+   「完整内容」按钮于是白亮出来。
+   用 transform:none 而不是 display:none/animation:none：
+   前者不影响布局（span 仍是 inline-block、文字照样占位），后两者会改变排版，
+   量出来的高度就不是真实的。 */
+.wordcard.is-measuring .word span,
+.wordcard.is-measuring .example,
+.wordcard.is-measuring .word-tools,
+.wordcard.is-measuring .meaning {
+  transform: none;
+  animation: none;
+}
+/* 卡片自己的入场动画也必须停：card-in 的起始帧是 scale(.98)，
+   而 getBoundingClientRect() **包含 transform** —— 量到的会是
+   0.98 × 真实高度。实测 418px 就是这么被量成 410px 的
+   （418 × 0.98 = 409.6 ≈ 410），锁低了 8px，内容刚好被裁掉。
+   所以 .wordcard.is-measuring 这一条不能少。 */
+.wordcard.is-measuring {
+  transform: none;
+  animation: none;
+}
+
+/* 「完整内容」弹窗的正文：长文本要能换行、能在弹窗里滚动，不能撑出屏幕。
+   卡片里被 line-clamp 裁掉的部分，在这里全量显示。
+   max-height 用 vh 而不是百分比：.modal-box 自己是 max-height:86vh + overflow:auto，
+   百分比高度在它身上算不出来，等于没限制。 */
+.fulltext-body {
+  margin: 4px 0 0;
+  max-height: 60vh;
+  overflow-y: auto;
+  font: var(--md-body-l);
+  letter-spacing: var(--md-track-body-l);
+  line-height: 1.8;
+  color: var(--md-on-surface);
+  overflow-wrap: anywhere;
+}
+.fulltext-body p { margin: 0 0 12px; }
+.fulltext-body p:last-child { margin-bottom: 0; }
+/* 各段的小标签（中文意思 / 单词 / 词性 / 例句） */
+.fulltext-body .ft-label {
+  display: block;
+  margin-bottom: 2px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  color: var(--md-on-surface-variant);
+}
+.fulltext-body .ft-word {
+  font: var(--md-headline-s);
+  color: var(--md-primary);
+}
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--md-on-surface-variant);
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.modal-close:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+.modal-box.wide { width: min(900px, 100%); }
+.modal-box > p.muted { margin: 0 0 14px; font: var(--md-body-s); line-height: 1.75; }
+.edit-meta { margin: 10px 0 0 !important; }
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  padding-top: 20px;
+  border: none;
+}
+
+/* ---- 5.2 选择工作表 ---- */
+.sheet-list {
+  margin: 4px 0 0;
+  max-height: 46vh;
+  overflow: auto;
+  background: var(--md-surface-container-lowest);
+  border: none;
+  border-radius: var(--md-shape-m);
+}
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.sheet-row + .sheet-row { background: var(--md-surface-container-high); }
+.sheet-row:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.sheet-row.is-picked { background: var(--md-primary-container); }
+.sheet-row.is-empty { opacity: .55; cursor: default; }
+.sheet-row.is-empty:hover { background: transparent; }
+.sheet-check { flex: none; }
+.sheet-info { flex: 1 1 auto; min-width: 0; }
+.sheet-name { margin: 0; font: var(--md-title-s); letter-spacing: var(--md-track-title-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-row.is-picked .sheet-name { color: var(--md-on-primary-container); }
+.sheet-meta { margin: 4px 0 0; font: var(--md-body-s); letter-spacing: var(--md-track-body-s); color: var(--md-on-surface-variant); }
+.sheet-row.is-picked .sheet-meta { color: var(--md-on-primary-container); opacity: .85; }
+.sheet-map { flex: none; display: flex; gap: 10px; flex-wrap: wrap; }
+.mini-field { display: flex; flex-direction: column; gap: 4px; }
+.mini-field span { font: var(--md-label-s); color: var(--md-on-surface-variant); }
+.mini-field select { max-width: 148px; min-height: 40px; padding: 8px 32px 8px 12px; font: var(--md-body-m); }
+
+/* ---- 5.3 使用说明 ---- */
+.help-list { margin: 0; padding-left: 22px; }
+.help-list li { margin-bottom: 12px; font: var(--md-body-m); line-height: 1.8; color: var(--md-on-surface-variant); }
+.help-list li b { color: var(--md-on-surface); }
+.help-list li::marker { color: var(--md-primary); font-weight: 600; }
+
+/* ---- 5.3b 语音包装载提示 ----   居中的 M3 对话框，复用 .modal / .modal-box 的遮罩与圆角，
+   这里只补「非交互提示」该有的样子：不响应点击、内容窄一点。 */
+.tts-modal { cursor: default; }
+.tts-box {
+  width: min(400px, 100%);
+  text-align: center;
+  pointer-events: none;
+  padding: 30px clamp(20px, 4vw, 32px) 26px;
+}
+.tts-box h2 { margin: 0 0 8px; font: var(--md-title-l); }
+.tts-box .muted {
+  margin: 0;
+  font: var(--md-body-s);
+  line-height: 1.7;
+  color: var(--md-on-surface-variant);
+}
+/* 旋转进度圈：M3 的不确定进度指示器 */
+.tts-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 4px solid var(--md-surface-variant);
+  border-top-color: var(--md-primary);
+  border-radius: var(--md-shape-full);
+  animation: tts-spin 1.1s linear infinite;
+}
+@keyframes tts-spin { to { transform: rotate(360deg); } }
+.tts-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+.tts-bar {
+  flex: 1 1 auto;
+  height: 4px;
+  background: var(--md-surface-variant);
+  border-radius: var(--md-shape-full);
+  overflow: hidden;
+}
+.tts-bar i {
+  display: block;
+  height: 100%;
+  width: 2%;
+  background: var(--md-primary);
+  border-radius: var(--md-shape-full);
+  transition: width var(--md-dur-medium) var(--md-ease-standard);
+}
+.tts-count {
+  flex: none;
+  min-width: 38px;
+  text-align: right;
+  font: var(--md-label-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--md-on-surface-variant);
+}
+.tts-note {
+  margin: 14px 0 0;
+  font: var(--md-body-s);
+  line-height: 1.7;
+  color: var(--md-on-surface-variant);
+}
+
+/* 尊重系统的「减少动态效果」：停掉旋转，只留进度条 */
+@media (prefers-reduced-motion: reduce) {
+  .tts-spinner { animation: none; border-top-color: var(--md-surface-variant); }
+}
+
+/* ---- 5.4 提示条：M3 的 snackbar ----
+   提示条不能和悬浮底栏重叠：底栏 z-index 1100、提示条 1400，
+   两者位置若叠在一起，看起来就是「提示和导航挤成一团」。
+   所以把提示条抬到栏体上方。
+
+   算式里的三个数要和底栏当前的值对上：
+     40 = .topbar-actions 的 bottom（窄屏也是 40）
+     72 = 栏体高度（8px 内边距 ×2 + 56px 导航项）
+     12 = 与栏体之间留的空隙
+   注意手机上栏体实际高 68px（导航项窄屏变 52px），
+   差 4px 但提示条只会离得稍远一点，不影响观感。 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(40px + 72px + 12px);
+  z-index: 1400;
+  max-width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%) translateY(16px);
+  padding: 14px 20px;
+  font: var(--md-body-m);
+  letter-spacing: var(--md-track-body-m);
+  color: var(--md-inverse-on-surface);
+  background: var(--md-inverse-surface);
+  border-radius: var(--md-shape-xs);
+  box-shadow: var(--md-elev-3);
+  opacity: 0;
+  transition: opacity var(--md-dur-medium) var(--md-ease-standard),
+              transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* 背词页没有底栏，提示条落回常规位置（M3 snackbar 距底 24） */
+body:has(#screen-study.is-active) .toast,
+html.nav-study .toast { bottom: 24px; }
+
+/* ---- 5.5 词书库搜索栏：M3 的搜索框 ---- */
+.library-toolbar { display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap; margin: 4px 0 8px; }
+.searchbox {
+  position: relative;
+  flex: 1 1 300px;
+  /* 宽度上限：搜索框的 flex-basis 是 300px，而手机视口（411px）扣掉 padding 只剩
+     387px。没有这条时，输入框的固有宽度会把搜索框撑到比视口还宽（实测 514px），
+     页面随之横向溢出，Chromium 会把布局视口整体放大到 544px —— 表现就是
+     「搜索框比屏幕还长、整个页面被缩小还能左右拖」。 */
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 8px 0 16px;
+  background: var(--md-surface-container-high);
+  border: none;
+  border-radius: var(--md-shape-full);
+  transition: background-color var(--md-dur-short) var(--md-ease-standard),
+              box-shadow var(--md-dur-short) var(--md-ease-standard);
+}
+.searchbox:hover { background: var(--md-surface-container-highest); }
+.searchbox:focus-within { background: var(--md-surface-container-lowest); box-shadow: inset 0 0 0 2px var(--md-primary); }
+.searchbox svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--md-on-surface-variant);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.searchbox input {
+  flex: 1 1 auto;
+  /* width:100% + min-width:0 是这里的重点：
+     <input> 的固有宽度来自 size 特性（默认 20 个字符）和 placeholder，
+     作为 flex 子项时「自动最小尺寸」会按它算，于是输入框能顶到 462px、
+     把整行撑出屏幕。min-width:0 解除这个下限，width:100% 让它老实跟着容器走。 */
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  font: var(--md-body-l);
+  color: var(--md-on-surface);
+  background: none;
+  border: none;
+  outline: none;
+}
+.searchbox input::placeholder { color: var(--md-on-surface-variant); }
+.searchbox input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.searchbox-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--md-on-surface-variant);
+  background: none;
+  border: none;
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.searchbox-clear:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+.search-info { margin: 0; font: var(--md-body-s); color: var(--md-on-surface-variant); }
+.search-info b { color: var(--md-primary); font-weight: 600; }
+
+/* ---- 5.6 按来源文件分组的列表 ---- */
+.book-group {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  background: var(--md-surface-container-lowest);
+  border: none;
+  border-radius: var(--md-shape-m);
+  overflow: hidden;
+}
+.book-group:first-child { margin-top: 4px; }
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--md-dur-short) var(--md-ease-standard);
+}
+.group-head:hover { background: color-mix(in srgb, var(--md-on-surface) 5%, transparent); }
+.book-group.is-collapsed .group-head { border-bottom-color: transparent; }
+.group-caret {
+  flex: none;
+  width: 14px;
+  font-size: 10px;
+  color: var(--md-on-surface-variant);
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized);
+}
+.book-group.is-collapsed .group-caret { transform: rotate(-90deg); }
+.group-name { font: var(--md-title-s); letter-spacing: var(--md-track-title-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-meta { font: var(--md-body-s); color: var(--md-on-surface-variant); white-space: nowrap; }
+.group-mini {
+  padding: 4px 10px;
+  font: var(--md-label-s);
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+  border: none;
+  border-radius: var(--md-shape-s);
+  white-space: nowrap;
+}
+.group-head .push { flex: 1 1 auto; }
+.group-check { flex: none; display: grid; place-items: center; cursor: pointer; }
+/* 分组内的词书列表：四周留出 padding，行与行之间用 gap 分开。
+   这两处留白就是「选中的蓝色圆角矩形」和分组标题、和相邻行之间的呼吸空间。 */
+.group-books {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.group-books .book { padding: 12px; }
+.book-group.is-collapsed .group-books { display: none; }
+
+/* ---- 5.7 编辑弹层里的预览表格 ---- */
+.preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 24px 0 8px; }
+.preview-head .muted { font: var(--md-body-s); }
+.preview-wrap {
+  max-height: 300px;
+  overflow: auto;
+  background: var(--md-surface-container-lowest);
+  border: none;
+  border-radius: var(--md-shape-m);
+}
+.preview { width: 100%; border-collapse: collapse; font: var(--md-body-m); letter-spacing: var(--md-track-body-m); }
+.preview th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 14px;
+  font: var(--md-label-m);
+  letter-spacing: var(--md-track-label-m);
+  text-align: left;
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface-container);
+  border: none;
+}
+.preview td { padding: 12px 14px; vertical-align: top; }
+.preview tr:last-child td { border-bottom: none; }
+.preview td:nth-child(1) { width: 48px; color: var(--md-on-surface-variant); font-variant-numeric: tabular-nums; }
+.preview td:nth-child(2) { color: var(--md-on-surface); }
+.preview td:nth-child(3) { color: var(--md-primary); font-weight: 500; }
+.preview td:nth-child(4) { color: var(--md-on-surface-variant); white-space: nowrap; }
+
+/* ============================================================
+   6. 响应式与无障碍
+   ============================================================ */
+
+@media (max-width: 720px) {
+  /* 顶栏字号不再在窄屏另设固定值：上面 .brand-text h1 用的是 clamp(30px, 8vw, 44px)，
+     窄屏自动落到 30px 附近 —— 这正是「大号字」想要的效果。
+     早先这里写死 18px，会把这个 clamp 盖掉，顶栏就退回小字了。
+     头像尺寸同理，由 .library-hero .brand-seal 的 clamp 接管。 */
+  /* 窄屏：上留白 120px（= 5 × 常规的 24px）。原 16px → 24px → 现在 120px。
+     原生顶栏留白只负责避开状态栏，这一大段是页面自己要的呼吸空间。
+     背词页固定 50px，和桌面取同一个数（不随屏幕宽变）。 */
+  main { padding: 120px 12px 120px; }
+  body:has(#screen-study.is-active) main,
+  html.nav-study main { padding-top: 50px; }
+
+  /* 窄屏：底栏居中收窄（内容只有圆形图标，不需要拉满整屏）。
+     离底边 40px，和桌面一致 ——
+     实测这台设备（1080px 宽、约 2.63 倍）原来 bottom:12px 时，
+     栏体底边离屏幕底边只剩 3 个物理像素，几乎贴着边缘，
+     这就是「太靠下」的来源。 */
+  .topbar-actions {
+    left: 50%;
+    right: auto;
+    bottom: 40px;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 24px);
+  }
+  .topbar-actions .btn.navi { width: 52px; height: 52px; }
+  #btnHelp { width: 44px; height: 44px; }
+  #btnBackHome.back-home { margin-bottom: 10px; }
+
+  .library-toolbar { gap: 10px; }
+  .searchbox { flex: 1 1 100%; }
+  .group-head { padding: 10px 12px; gap: 8px; }
+  .library-tools { gap: 0; }
+
+  /* 统计页标题不再在窄屏另设固定值：上面 .stats-head h2 用的是
+     clamp(40px, 11vw, 60px)，和词书库页首那个大字同一套取值，
+     窄屏会自动缩小。这里原来写死 22px，正是「标题不同步」的来源之一。 */
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .stat-num { font-size: 26px; }
+  .stats-cols { grid-template-columns: 1fr; gap: 24px; }
+  .trend { height: 128px; }
+  .trend-val, .trend-day { font-size: 10px; }
+
+  .dropzone.compact { flex-direction: column; align-items: stretch; gap: 14px; }
+  .dropzone.compact .dropzone-actions { justify-content: flex-start; }
+
+  .book { flex-wrap: wrap; gap: 10px 12px; }
+  .book-actions { width: 100%; justify-content: flex-end; }
+  .startbar-main { margin-left: 0; width: 100%; justify-content: space-between; }
+  .startbar-opts .field-inline { min-width: 100%; }
+
+  .sheet-row { flex-wrap: wrap; align-items: flex-start; }
+  .sheet-map { width: 100%; }
+  .mini-field { flex: 1 1 30%; }
+  .mini-field select { max-width: none; width: 100%; }
+
+  .hud { padding: 12px 14px; }
+  .hud-books { max-width: 100%; }
+  /* 窄屏降一档：Headline M(28) → Headline S(24)，仍走标度，不写裸字号 */
+  .hud-round-num { font: var(--md-headline-s); }
+  .hud-stats { order: 3; width: 100%; justify-content: flex-start; }
+  /* 进度文字在窄屏不再缩字号：它现在是「第 N 轮」后面的一枚胶囊，
+     跟着 .hud-round-line 的基线走，缩它会和两侧的 label 不齐。 */
+
+  .wordcard { padding: 20px 18px 24px; border-radius: var(--md-shape-l); }
+  .card-stage { padding: 4px 0 20px; }
+  .report { padding: 22px 18px; }
+  .report::after { display: none; }
+  .report-cols { grid-template-columns: 1fr; gap: 20px; }
+  .modal-box { padding: 24px 18px; }
+  /* 这里原来是 `.btn.yes, .btn.no { min-width: 0; flex: 1 1 40%; }` ——
+     让「不记得 / 记得」在窄屏等宽拉伸（实测 411px 下各 188px），
+     和另一对的固定宽度对不上。宽度现在由上面的 width: 155px 统一管。
+     注意：只在上面写死宽度是不够的，媒体查询里的 flex 在窄屏下同样命中
+     且位置更靠后，会把 flex-basis 拉起来，所以那条必须删掉。 */
+  .controls { gap: 12px; }
+  .reviewbook-item { flex-wrap: wrap; gap: 6px 10px; }
+  .reviewbook-item .rb-tags { width: 100%; }
+}
+
+/* 触摸端：M3 建议交互目标不小于 48dp */
+@media (pointer: coarse) {
+  .iconbtn { width: 44px; height: 44px; }
+  .link { min-height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* 高对比偏好：把描边加粗，保证边界清楚 */
+@media (prefers-contrast: more) {
+  .btn.ghost, .btn.no, .speak-btn, select, input[type="text"], .cf-input { border-width: 2px; }
+}
+
+/* ---- 矮屏：把背词页的「固定开销」压掉 ----
+   背词页的目标是「一屏装完、不用上下滑」。在正常手机上（视口 800~900）
+   靠 app.js 的 lockCardHeight() 把词卡夹到可用空间就够了；但视口再矮
+   （横屏、分屏、小屏机）时，词卡会触到**内容的固有最小高度**——
+   flex 可以压缩带有 min-height:0 的子项，却压不动「中文意思 + 单词 + 词性 +
+   发音按钮」这些实打实占位的行，于是整页还是会溢出去。
+   下面按高度分两档，逐级压掉非必需的固定开销。
+   用 height 而不是 width 查询：这里要解决的是纵向空间不足，
+   和设备有多宽无关。 */
+@media (max-height: 760px) {
+  /* 第一档：收紧各段的垂直留白，不改结构 */
+  body:has(#screen-study.is-active) .card-stage,
+  html.nav-study .card-stage { padding: 2px 0 10px; }
+  body:has(#screen-study.is-active) .hud,
+  html.nav-study .hud { margin-bottom: 12px; padding: 10px 16px; }
+  body:has(#screen-study.is-active) .study-foot,
+  html.nav-study .study-foot { margin-top: 14px; }
+  .meaning-wrap { padding: 14px 0 0; }
+  /* 矮屏只压「译文 ↔ 词性 ↔ 单词」这两段间距（词性上下 margin 同步收窄），
+     .answer 自己不参与间距 —— 它的 padding-top 必须是 0，
+     否则下间距又会被它撑开（见 .answer 的说明）。 */
+  .answer { margin-top: 0; padding-top: 0; }
+  .word-pos { margin: 7px 0; }
+  .word-tools { margin-top: 10px; }
+  .example { margin-top: 8px; }
+}
+@media (max-height: 640px) {
+  /* 第二档：把「键盘快捷键提示」整行去掉（它不是信息，只是提示），
+     并再压一档留白。到这一档例句也不再是必需项 —— 它是最长的一段，
+     去掉后词卡才能真的缩下来；单词和释义始终保留。 */
+  body:has(#screen-study.is-active) .study-foot .kbd-tip,
+  html.nav-study .study-foot .kbd-tip { display: none; }
+  body:has(#screen-study.is-active) .study-foot,
+  html.nav-study .study-foot { margin-top: 8px; }
+  .meaning-wrap { padding: 10px 0 0; }
+  .meaning { font-size: clamp(22px, 4.6vw, 34px); }
+  .word { font-size: clamp(24px, 5vw, 36px); }
+  .example { display: none; }
+  /* 最矮的一档：两段间距再收到 6px（同样由词性的 margin 独家控制） */
+  .answer { margin-top: 0; padding-top: 0; }
+  .word-pos { margin: 6px 0; }
+}

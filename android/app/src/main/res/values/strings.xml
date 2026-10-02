@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用名（桌面图标下面、应用信息页标题）。
+         注意别和 build.gradle 里的 versionName 搞混：
+         那个是 "Duckduck"，是版本名，只显示在应用信息页的「版本：」那一行。
+         两者是两个不同的字段，故意取不同的值。 -->
+    <string name="app_name">Wordsduck2</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 只是启动时的一层底色，页面加载完就被网页自己的 surface 覆盖。
+         取 M3 浅色 surface 值，避免启动瞬间闪白或闪黑。
+         深色模式另有一份 values-night/colors.xml（#111318），两份要保持与
+         assets/style.css 里 md-surface 的浅/深取值一致  边到边之后这层
+         底色会从状态栏、导航栏的留白处露出来。 -->
+    <color name="wordsduck_bg">#FDFBFF</color>
+</resources>

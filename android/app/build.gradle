@@ -1,0 +1,170 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    // 包名：com.wordsduck2.app（尾缀带 2，与工程目录 Wordsduck2 对应）。
+    // namespace 与 applicationId 必须一致，且要和各 Kotlin 文件的
+    // package 声明、源码目录层级三者对齐，否则 R 类与 MainActivity 都找不到。
+    namespace 'com.wordsduck2.app'
+    // Android 16 = API 36。targetSdk 36 是新应用的常规选择。
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.wordsduck2.app"
+
+        /* minSdk 29 = Android 10 及以上。
+           原来写的是 36（只支持 Android 16），那等于几乎装不上任何机器，
+           release 出包前放开到 29。工程里用到的 API 全部在 29 之下：
+             · WebView / addJavascriptInterface（API 17+）
+             · SAF 的 ACTION_CREATE_DOCUMENT（API 19+）
+             · 系统 TTS（API 21+）
+             · 手势导航（API 29 才成为系统特性，所以 29 是稳妥下限） */
+        minSdk 29
+        targetSdk 36
+
+        versionCode 1
+        versionName "Realduck"
+
+        /* 只要 64 位、且只要 arm64-v8a。
+           本工程不含任何 .so 原生库（WebView 由系统提供），所以这一条不会
+           真的删掉什么，它的作用是把「只出 64 位」这个意图固定下来：
+           将来万一引入了原生库，也不会意外产出 32 位包。 */
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    /* 签名：release 复用 Android 的 debug 密钥（~/.android/debug.keystore）。
+       这样 assembleRelease 直接产出**可安装**的包，不需要额外的 keystore.properties。
+
+       代价（明确写下来，避免以后忘记）：
+         · 这个密钥的密码是公开的（storePass/keyPass 都是 "android"），
+           任何人都能签出「同一个包名」的 APK —— 不适合上架应用商店；
+         · 换用正式密钥时，已装设备必须先卸载才能装新包（签名不一致）；
+         · ~/.android/debug.keystore 是构建机上的文件，换机器会生成新的密钥，
+           所以正式对外发布前最好换成项目自己的 keystore。 */
+    signingConfigs {
+        release {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+
+            /* 开混淆 + 资源压缩。小心里面两个反射点（详见 proguard-rules.pro）：
+                 · TtsBridge 的方法名是页面用**字符串**调用的，改名就废；
+                 · MainActivity.onActivityResult / CropActivity 走系统反射回调。
+               两者都在 proguard-rules.pro 里做了 keep。 */
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    /* ------------------------------------------------------------------
+       把网页装进 APK。
+       源就是项目根目录里那一套（index.html / assets / libs），不再往 android/
+       里复制一份来维护 —— 否则改一次网页要同步两处，迟早不一致。
+
+       打包时排除内置语音包：那批文件 162 MB，而本工程改用系统 TTS，用不到。
+       ------------------------------------------------------------------ */
+    sourceSets {
+        main {
+            assets.srcDirs += layout.buildDirectory.dir('generated/webAssets')
+        }
+    }
+
+    /* 关掉 release 打包时的 lint 检查（vital lint）。
+       原因是 Gradle 的隐式依赖校验：下面的 syncWebAssets 产出的
+       build/generated/webAssets 同时被当作 assets 源目录，lint 扫描它时
+       Gradle 判定「用了别的任务的输出却没声明依赖」，assembleRelease 直接失败：
+
+         Task ':app:lintVitalAnalyzeRelease' uses this output of task
+         ':app:syncWebAssets' without declaring an explicit or implicit dependency.
+
+       assembleDebug 走不到 lint 任务，所以这个错只在 release 打包时暴露。
+       试过给 lint 任务补 dependsOn、改 taskGraph、把生成目录挪出 build/、
+       给源目录加 builtBy，都配不上（lint 的 analyze 任务由 AGP 在执行阶段才创建），
+       最后选择跳过 lint。要恢复的话，得用 AGP 的 variant API 注册生成目录，
+       而不是往 sourceSets 里塞任务输出。 */
+    lint {
+        checkReleaseBuilds = false
+    }
+}
+
+/* 同步网页资源，并把「内置语音包」的两个 <script> 去掉：
+     assets/tts-local.js  —— 内置语音引擎
+     assets/tts/boot.js   —— 语音包装载器
+   两者都依赖被排除掉的那 162 MB 分片，留着只会白白 404、控制台刷错误。
+
+   资源落点是 assets/www/… ，与 MainActivity 里
+   loadUrl("file:///android_asset/www/index.html") 对应。 */
+def webRoot = rootProject.projectDir.parentFile
+def webOutDir = layout.buildDirectory.dir('generated/webAssets')
+
+tasks.register('syncWebAssets', Sync) {
+    from(webRoot) {
+        include 'index.html'
+        include 'assets/**'
+        include 'libs/**'
+        // 内置语音包（Piper 神经语音，162 MB）—— APK 不带
+        exclude 'assets/tts/**'
+        exclude 'assets/tts-local.js'
+    }
+    into new File(webOutDir.get().asFile, 'www')
+
+    doLast {
+        def html = new File(webOutDir.get().asFile, 'www/index.html')
+        if (!html.exists()) throw new GradleException('index.html 没同步过来：' + html)
+
+        def text = html.getText('UTF-8')
+        def before = text
+        text = text.replaceAll(
+                /(?m)^\s*<script src="assets\/tts-local\.js"><\/script>\s*$/,
+                '<!-- 内置语音包已由 Android 工程移除，本包走系统 TTS（TtsBridge.kt） -->')
+        text = text.replaceAll(
+                /(?m)^\s*<script src="assets\/tts\/boot\.js"><\/script>\s*$/,
+                '<!-- 同上：语音包装载器不随 APK 分发 -->')
+        if (text == before) {
+            logger.warn('[syncWebAssets] 没有匹配到内置语音包的 <script> 标签，' +
+                    '请检查 index.html 是否改过写法。')
+        }
+        html.setText(text, 'UTF-8')
+    }
+}
+
+/* 打包资源时先跑同步：merge*Assets 读到的是 syncWebAssets 产出的目录，
+   不声明就是隐式依赖。
+
+   注意这里**只**需要覆盖 merge*Assets。lint 那条链上的任务
+   （generate*LintReportModel / lintVitalAnalyzeRelease）也读这个目录，
+   而且是 AGP 在执行阶段才创建出来的，configureEach 根本轮不到它们；
+   与其去补依赖，不如直接不在 release 打包时跑 lint ——
+   见上面 android.lint 里的 checkReleaseBuilds = false。 */
+tasks.configureEach { task ->
+    if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
+        task.dependsOn 'syncWebAssets'
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
+}

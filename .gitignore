@@ -1,0 +1,45 @@
+# ---------------- 构建产物 ----------------
+# 安卓：Gradle / AGP 的中间产物与 APK
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+*.aab
+
+# 成品 APK 是**要进仓库**的（放在根目录，方便直接下载安装），
+# 所以这里只挡构建目录里的中间产物，根目录的成品用下面的 ! 放行。
+android/app/build/outputs/**/*.apk
+!Wordsduck2-*.apk
+
+# 便携版 git（下载在项目里，不属于仓库内容）
+.tools/
+
+# ---------------- 本地验证产物 ----------------
+# 我用真机 / 无头浏览器截图与 CDP 脚本落在这里，不进仓库
+.verify/
+
+# ---------------- 第三方代码副本 ----------------
+# 这是 @material/web 2.5.0 官方仓库的未修改副本（Apache-2.0），
+# 当初拉下来是为了照着它的规范改 UI。要看就去看上游：
+#   https://github.com/material-components/material-web
+设计规范/
+
+# ---------------- 体积过大的语音包 ----------------
+# assets/tts/chunks/ 是 Piper 神经语音包，127 MB 原始数据经 base64 展开成
+# 162 MB 的 .js 分片。仓库里不放（clone 会非常慢），
+# 但**目录本身保留**，好让 assets/tts/chunks/README.md 说明怎么补回来。
+assets/tts/chunks/*
+!assets/tts/chunks/README.md
+
+# 注意：android/app/src/main/res/ 下的图标是**要进仓库**的。
+# 它们虽然由 tools/make-icons.py 从 logo.png 生成，但那是 Python 脚本，
+# 克隆下来的人不该为了编译一个 APK 先去装 Python —— 所以把成品一起带上。
+
+# ---------------- 系统 / 编辑器 ----------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/

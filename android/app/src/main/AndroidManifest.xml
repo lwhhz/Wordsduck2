@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 系统 TTS 需要查询已安装的语音引擎。
+         Android 11（API 30）起，不声明这一段就看不到任何 TTS 引擎，
+         TextToSpeech 会初始化失败 —— 这是最容易漏掉的一条。 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.Wordsduck">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 头像 1:1 裁剪界面。自己的 Activity，不依赖任何第三方应用
+             （系统那个 com.android.camera.action.CROP 在 MIUI 上实测不落盘，
+             详见 CropActivity 的类注释）。不需要任何权限 ——
+             它直接按文件路径读缓存里的副本、结果用 data URL 回传，
+             全程不碰公共存储，所以也不需要 FileProvider。 -->
+        <activity
+            android:name=".CropActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Wordsduck.Crop" />
+    </application>
+</manifest>

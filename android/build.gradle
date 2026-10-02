@@ -1,0 +1,7 @@
+// 顶层构建文件：只声明插件来源，具体配置在各模块里。
+// 版本说明：compileSdk 36（Android 16）需要 AGP 8.9+ / Gradle 8.11+，
+// 所以这里比「能编 SDK 34」的版本要高，不要往低改。
+plugins {
+    id 'com.android.application' version '8.9.0' apply false
+    id 'org.jetbrains.kotlin.android' version '2.0.21' apply false
+}

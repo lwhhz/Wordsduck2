@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordsduck2 · 本地背单词</title>
+<!-- 图标就是项目根目录的 logo.png（由 tools/make-icons.py 缩放生成）。
+     APK 里这三个文件都会随 assets/** 一起打进 assets/www/。 -->
+<link rel="icon" type="image/png" href="assets/logo-192.png">
+<link rel="apple-touch-icon" href="assets/logo-192.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<!-- 纸张颗粒层（.grain）已随 M3 改版退役：M3 用纯色色调面表达层次，
+     不再叠加纹理。样式表里仍留了一条 display:none 兜底。 -->
+
+<!-- 原来的实体顶栏改成了「悬浮底栏」：
+     栏体本身不再占版面高度（.topbar 只是定位用的空壳），
+     两个导航项浮在页面底部。品牌标识移到词书库页首（见 .library-hero）。
+     所有按钮的 id / class / 事件绑定统统没动，app.js 照旧按 id 找它们。 -->
+<header class="topbar">
+  <!-- 悬浮底栏的定位/配色由 .topbar-actions 承担（app.js 的钩子都挂在这里），
+       nav 只做语义容器，视觉上不参与。 -->
+  <div class="topbar-actions">
+    <nav class="topbar-nav" aria-label="主导航">
+      <!-- 两个导航项：主页（词书库）与统计（数据备份所在页） -->
+      <button class="btn tiny ghost navi" id="btnHome" aria-label="主页 · 词书库"><span>主页</span></button>
+      <button class="btn tiny ghost navi" id="btnStats" aria-label="学习统计"><span>统计</span></button>
+    </nav>
+
+    <!-- 使用说明是工具入口、不是页面切换，所以做成末端的图标按钮，
+         不跟两个导航项抢位置 -->
+    <button class="btn tiny ghost" id="btnHelp" aria-label="使用说明" title="使用说明"><span>使用说明</span></button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ 1. 词书库 ============ -->
+  <section class="screen is-active" id="screen-library">
+
+    <!-- ============ 顶栏（大留白版） ============
+         参考图那种编辑精选辑的排版：左边一列文字，右边一个头像，整体居中。
+         字号只分两级，没有其它装饰元素。
+         随机按钮没做 —— 参考图里那个按钮的功能由下面「背景词」那一块承担。
+
+         #brandSub 保留着：app.js 每开一轮背词都会往它写「第 N 轮 · M 本词书」，
+         由 profile.js 决定它和 #brandSign 谁显示。
+         本轮把顶栏改成「纯签名」之后，那行轮次信息不再露出（用户确认过不要），
+         但元素留着 —— 删掉它 app.js 会往 null 上写 textContent 而报错。 -->
+    <div class="library-hero">
+      <div class="brand-text">
+        <h1>单词卡</h1>
+        <p class="brand-sign" id="brandSign" hidden></p>
+        <p id="brandSub" hidden>读取本地 Excel 词书 · 只看中文，猜出英文</p>
+      </div>
+      <!-- 头像内容由 assets/profile.js 填：预设字符，或上传照片后的背景图 -->
+      <span class="brand-seal" aria-hidden="true">词</span>
+    </div>
+
+    <!-- ============ 背景词：随机展示词书里的一个词条 ============
+         对应参考图里那堆随机封面 —— 只是内容换成词条本身。
+         整块可点，点了换一个；数据由 app.js 的 renderHeroWord() 填。
+
+         这里**不写** aria-label：写了会把按钮里那串
+         「英文 + 词性 + 中文 + 例句」整个盖掉，读屏用户就听不到词条本身了。
+         按钮的可访问名直接用它的内容，正好是我们要播报的东西。 -->
+    <button class="hero-word" id="heroWord" type="button">
+      <span class="hero-word-en" id="heroWordEn"></span>
+      <span class="hero-word-pos" id="heroWordPos" hidden></span>
+      <span class="hero-word-cn" id="heroWordCn"></span>
+      <span class="hero-word-ex" id="heroWordEx" hidden></span>
+    </button>
+
+    <div class="dropzone compact" id="dropzone">
+      <div class="dropzone-icon" aria-hidden="true">
+        <!-- M3 的 upload 图标 -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/>
+          <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>
+        </svg>
+      </div>
+      <div class="dropzone-copy">
+        <h2>把词书 Excel 拖到这里</h2>
+        <p>支持 <b>.xlsx</b> / <b>.xls</b> / <b>.csv</b>。表头含「英文 / 单词 / 词组」与「中文 / 意思 / 释义」两列即可。一次导入会<b>累加</b>到词书库，不会覆盖已有的词书；文件里有多个工作表时，可以勾选多张、分别导入成多本词书。</p>
+      </div>
+      <div class="dropzone-actions">
+        <button class="btn primary" id="btnPick">选择文件</button>
+        <button class="btn ghost" id="btnDemo">示例词书</button>
+        <button class="btn ghost" id="btnTemplate" type="button">下载模板</button>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.txt" hidden>
+    </div>
+
+    <!-- ============ 动态词书：复习本 ============
+         标题左侧原来有一个勾选框（勾上就能和别的词书合并成一轮）。
+         已按要求移除：复习本现在只有「开始复习」这一个入口，
+         不再参与词书库那套「勾选合并」。 -->
+    <section class="reviewbook" id="reviewBook">
+      <div class="reviewbook-head">
+        <div class="reviewbook-title">
+          <h2>复习本 <span class="pill" id="reviewCount">0</span></h2>
+          <p class="reviewbook-meta" id="reviewMeta">收录 0 个 · 待复习 0 个</p>
+        </div>
+        <span class="reviewbook-badge">动态词书 · 自动收录</span>
+      </div>
+      <p class="reviewbook-note" id="reviewNote"></p>
+      <ul class="reviewbook-list" id="reviewList"></ul>
+      <div class="reviewbook-actions">
+        <button class="btn primary" id="btnReviewStart">开始复习（20 词）</button>
+        <button class="btn ghost danger" id="btnReviewClear">清空复习本</button>
+        <span class="reviewbook-tip muted" id="reviewTip"></span>
+      </div>
+    </section>
+
+    <div class="library">
+      <div class="library-head">
+        <h2>词书库 <span class="pill" id="bookCount">0</span></h2>
+        <div class="library-tools">
+          <button class="link" id="btnSelectAll">全选</button>
+          <button class="link" id="btnSelectNone">全不选</button>
+          <button class="link" id="btnGroupExpand">展开分组</button>
+          <button class="link" id="btnGroupCollapse">收起分组</button>
+          <button class="link danger" id="btnDeleteSelected">删除所选</button>
+        </div>
+      </div>
+
+      <div class="library-toolbar">
+        <label class="searchbox">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="8.6" cy="8.6" r="5.3"/>
+            <path d="m12.7 12.7 3.9 3.9"/>
+          </svg>
+          <!-- size="1"：<input> 的固有宽度默认按 20 个字符算，手机上这个固有宽度
+               会撑破搜索框、把整页顶出屏幕（见 style.css 的 .searchbox 注释）。
+               把它压到最小，真实宽度完全交给 CSS 的 width:100% 决定。 -->
+          <input type="search" id="libSearch" size="1" placeholder="搜索词书名称、文件名、工作表或词条…" autocomplete="off" spellcheck="false">
+          <button type="button" class="searchbox-clear" id="btnSearchClear" hidden aria-label="清空搜索">×</button>
+        </label>
+        <p class="search-info" id="searchInfo"></p>
+      </div>
+
+      <ul class="booklist" id="bookList"></ul>
+      <div class="empty-state" id="emptyState">还没有任何词书。拖一个 Excel 进来，或先点「示例词书」试试。</div>
+      <div class="empty-state" id="libEmpty" hidden>没有匹配的词书。换个关键词，或点右侧的 × 清空搜索。</div>
+      <p class="library-tip muted">词书按<b>来源文件</b>自动分类，点分组标题一行即可<b>收起 / 展开</b>。勾选一本或多本词书 → 点右下角「开始背词」；多本会合并成一轮，重复的词自动只留一条。词数超过 <b>50</b> 的词书会<b>分批</b>背：一轮最多背 50 词，背完这一行会亮出<b>进度条</b>和「还剩多少词」，点「<b>继续背</b>」接着背下一批；整本都过完一遍之后，按钮才变成「重背」，从头再来。</p>
+    </div>
+
+    <div class="startbar">
+      <div class="startbar-opts">
+        <label class="switch">
+          <input type="checkbox" id="optShuffle" checked>
+          <span class="switch-ui"></span>
+          <span class="switch-text">随机打乱顺序</span>
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">不记得的词</span>
+          <select id="selRequeue">
+            <option value="random">随机插入后面几张</option>
+            <option value="end">排到本轮队尾</option>
+            <option value="front">立刻再考一次</option>
+          </select>
+        </label>
+        <label class="field field-inline">
+          <span class="field-label">每本每轮</span>
+          <select id="selBatch" title="一本词书超过这个数量时，一轮只背这么多词；背完在词书库里显示进度，可以接着背下一批。只有整本都过完一遍，才会从头再来。">
+            <option value="20">最多 20 词</option>
+            <option value="30">最多 30 词</option>
+            <option value="50" selected>最多 50 词</option>
+            <option value="100">最多 100 词</option>
+            <option value="0">不限（整本一轮背完）</option>
+          </select>
+        </label>
+      </div>
+      <div class="startbar-main">
+        <span class="sel-summary" id="selSummary">已选 0 本 · 0 词条</span>
+        <button class="btn primary large" id="btnStart">开始背词</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============ 2. 背词 ============ -->
+  <section class="screen" id="screen-study">
+    <!-- 回主页：半透明条，排在「背词进度」模块上方，不遮挡任何信息。
+        放在 #screen-study 里面，所以只在背词页出现；
+         平时带 hidden，app.js 在开背时把它显出来（两个条件一致）。
+         必须留在 .topbar-actions 外面：背词页要整条藏掉底栏，
+         display:none 会把子孙一并藏掉，放里面这个条也会跟着消失。 -->
+    <button class="btn tiny ghost back-home" id="btnBackHome" hidden aria-label="返回词书库">
+      <span>返回词书库</span>
+    </button>
+
+    <div class="hud" id="hud">
+      <!-- 描边进度：沿**模块自己的边框**跑一圈。
+           用 SVG 而不是 border-image / conic-gradient：
+             · border-image 不支持圆角；
+             · conic-gradient 是从**中心角度**扫的，矩形上四边速度不均、圆角处很怪。
+           结构：一条 <path> 画圆角矩形，用 stroke-dasharray/dashoffset 控制显示长度。
+           为什么是 <path> 而不是 <rect rx=...>：
+             1) rect 的 rx 在「非等比拉伸」的 SVG 里会被拉成椭圆角，和模块的圆角对不上，
+                而我们既要不设 viewBox（让 1 用户单位 = 1 CSS px，避免换算），
+                又要圆角是正圆 —— path 用 C 指令写出来的圆弧天然是正圆，绕开这个矛盾；
+             2) rect 的 getTotalLength() 在部分浏览器上支持不一致（这是已知坑）。
+           半径与坐标全部由 app.js 的 buildHudRingPath() 按模块实测尺寸生成，
+           所以路径永远贴合模块的圆角和边框，改尺寸不用改任何常量。
+           pathLength="100" 把周长归一化成 100：JS 只改 stroke-dashoffset 一个数，
+           既不用 getTotalLength()，也不用按圆角矩形公式手算周长
+           （2*(w-2r) + 2*(h-2r) + 2πr）。 -->
+      <svg class="hud-ring" aria-hidden="true">
+        <path class="hud-ring-track" id="hudRingTrack" pathLength="100" d=""></path>
+        <path class="hud-ring-bar" id="hudRingBar" pathLength="100" d=""></path>
+      </svg>
+      <div class="hud-round">
+        <div class="hud-round-line">
+          <span class="hud-label">第</span>
+          <span class="hud-round-num" id="hudRound">1</span>
+          <span class="hud-label">轮</span>
+          <span class="hud-ring-text" id="ringText" title="本轮进度">0%</span>
+        </div>
+        <p class="hud-books" id="roundBooks"></p>
+      </div>
+      <div class="hud-stats">
+        <span><b id="hudRemain">0</b> 张待背</span>
+        <span class="dot"></span>
+        <span><b id="hudDone">0</b> 已过关</span>
+        <span class="dot"></span>
+        <span><b id="hudRepeat">0</b> 次重考</span>
+      </div>
+    </div>
+
+    <div class="card-stage">
+      <article class="wordcard" id="wordcard" aria-live="polite">
+        <div class="card-head">
+          <span id="cardIndex">第 1 张</span>
+          <span id="cardHintFlag" class="card-flag"></span>
+        </div>
+
+        <div class="card-body">
+          <div class="meaning-wrap">
+            <p class="meaning-label">中文意思</p>
+            <p class="meaning" id="meaning"></p>
+            <!-- 词性：跟在中文意思下面，属于**提问**这一侧的信息，
+                 和答案一起揭示没有关系 —— 它一开始就可见。
+                 早先词性是靠「提示 · 看词性」按钮临时展开的，那个按钮已去掉。 -->
+            <p class="word-pos" id="wordPos" hidden></p>
+          </div>
+
+          <div class="answer" id="answer" hidden>
+            <p class="word" id="wordText"></p>
+            <div class="word-tools">
+              <button class="speak-btn" id="btnSpeak" type="button" title="朗读这个单词（快捷键 S）" aria-label="朗读单词">
+                <svg class="speak-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 9.4h3.1L11.9 5.5v13L7.1 14.6H4z"/>
+                  <path class="speak-wave" d="M15.3 9.7a3.4 3.4 0 0 1 0 4.6"/>
+                  <path class="speak-wave" d="M17.9 7.3a6.9 6.9 0 0 1 0 9.4"/>
+                </svg>
+                <span id="speakTxt">发音</span>
+              </button>
+              <!-- 「完整内容」：只在卡片内容被截断时才出现（app.js 的 detectCardOverflow）。
+                   默认 hidden，和发音按钮同排、位于其右侧。 -->
+              <button class="speak-btn" id="btnFullText" type="button" hidden
+                      aria-haspopup="dialog" aria-controls="fullTextModal" aria-expanded="false"
+                      aria-label="查看这张卡的完整内容">完整内容</button>
+            </div>
+            <p class="example" id="wordExample"></p>
+          </div>
+        </div>
+
+        <div class="stamp" id="stamp" hidden><span id="stampText"></span></div>
+      </article>
+    </div>
+
+    <div class="controls" id="controlsAsk">
+      <button class="btn no large" id="btnNo">不记得<kbd>1</kbd></button>
+      <button class="btn yes large" id="btnYes">记得<kbd>2</kbd></button>
+    </div>
+    <div class="controls" id="controlsNext" hidden>
+      <button class="btn primary large" id="btnNext">下一个<kbd>空格</kbd></button>
+      <button class="btn ghost large step-undo" id="btnUndoStep">撤销<kbd>U</kbd></button>
+    </div>
+
+    <div class="study-foot">
+      <button class="link" id="btnUndo">撤销上一张</button>
+      <button class="link" id="btnQuit">结束本轮</button>
+      <span class="kbd-tip">键盘：<b>1</b> 不记得 · <b>2</b> 记得 · <b>空格</b> 下一个 · <b>U</b> 撤销 · <b>S</b> 发音</span>
+    </div>
+  </section>
+
+  <!-- ============ 3. 完成 ============ -->
+  <section class="screen" id="screen-done">
+    <div class="report">
+      <div class="report-head">
+        <p class="report-kicker">第 <span id="doneRound">1</span> 轮 · 完成</p>
+        <h2>这一轮背完了</h2>
+        <p class="muted" id="doneSub"></p>
+        <p class="muted done-books" id="doneBooks"></p>
+        <p class="muted done-review" id="doneReview" hidden></p>
+      </div>
+
+      <div class="score-grid">
+        <div class="score"><span class="score-num" id="doneTotal">0</span><span class="score-label">本轮词数</span></div>
+        <div class="score"><span class="score-num" id="doneFirst">0</span><span class="score-label">一次就记住</span></div>
+        <div class="score"><span class="score-num" id="doneRate">0%</span><span class="score-label">一次通过率</span></div>
+        <div class="score"><span class="score-num" id="doneTime">0:00</span><span class="score-label">用时</span></div>
+      </div>
+
+      <div class="report-cols">
+        <div class="report-col">
+          <h3>需要重点复习 <span class="pill" id="doneForgotCount">0</span></h3>
+          <ul class="wordlist" id="doneForgotList"></ul>
+        </div>
+        <div class="report-col">
+          <h3>已经拿下 <span class="pill ok" id="doneMasteredCount">0</span></h3>
+          <ul class="wordlist muted-list" id="doneMasteredList"></ul>
+        </div>
+      </div>
+
+      <div class="report-actions">
+        <button class="btn primary large" id="btnAgain">再背一轮（重新打乱）</button>
+        <button class="btn ghost" id="btnBackLibrary">返回词书库</button>
+        <button class="btn ghost" id="btnDoneStats">查看学习统计</button>
+        <button class="btn ghost" id="btnNewFile">导入新词书</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. 学习统计 ============ -->
+  <section class="screen" id="screen-stats">
+    <div class="stats-head">
+      <h2>你的背词足迹</h2>
+      <p class="muted" id="statsSub">还没有学习记录，先去背几个词吧。</p>
+      <button class="btn tiny reset-stats" id="btnStatsReset">清空统计</button>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>背词热力图</h3>
+        <p class="muted" id="heatSub">最近两个月，每一格代表一天，颜色越深表示那天背的词越多。</p>
+        <!-- 只有这个小按钮进 Tab 顺序。
+             早先把整个 panel-head 做成按钮，但里面还套了 #heatSub —— 
+             交互内容不能嵌套（button 里放 p），读屏和键盘都会出问题。
+             做成独立按钮之后，键盘路径也更清楚：Tab 到这里 → 回车开弹窗。 -->
+        <button class="trend-more heat-more" id="btnHeatOpen" type="button"
+                aria-haspopup="dialog" aria-controls="heatModal" aria-expanded="false"
+                aria-label="查看最近一年的背词热力图">
+          <span>看一年</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5 15.5 12 9 18.5"/></svg>
+        </button>
+      </div>
+      <div class="heat-scroll">
+        <div class="heat" id="heatWrap" aria-hidden="true"></div>
+      </div>
+      <div class="heat-foot">
+        <span class="muted" id="heatRange"></span>
+        <span class="heat-legend">
+          <span class="muted">少</span>
+          <i class="heat-cell lv0"></i><i class="heat-cell lv1"></i><i class="heat-cell lv2"></i><i class="heat-cell lv3"></i><i class="heat-cell lv4"></i>
+          <span class="muted">多</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- 最近 7 天：整块就是按钮，点开看 14 天。
+         用 <button> 而不是给 div 加 click —— 键盘 Tab 能聚焦、回车/空格能触发、
+         读屏会念成「按钮」，这些都是原生行为，不必自己补一遍。
+
+         无障碍上的两个决定：
+           · 按钮本身**不加** aria-hidden。它在 Tab 顺序里、可以聚焦，
+             给可聚焦元素挂 aria-hidden 会让它从无障碍树里消失 ——
+             读屏用户会遇到一个「看不见的、却要停一下」的焦点，属于 WCAG 违规。
+           · 只把柱子图那一块标成 aria-hidden：它是纯图形，
+             每根柱子的 div 没有文本语义，整体趋势由按钮的 aria-label 描述即可。
+             注意这个属性必须写在 #trendWrap 上、不能提到按钮上，
+             两种写法的差别就是上面说的那件事。 -->
+    <button class="panel trend-panel" id="btnTrendOpen" type="button"
+            aria-haspopup="dialog" aria-controls="trendModal" aria-expanded="false"
+            aria-label="最近 7 天背词趋势，点击查看最近 14 天">
+      <span class="panel-head">
+        <span class="panel-title">最近 7 天</span>
+        <span class="muted" id="trendSub">每天背过的词条数量</span>
+        <span class="trend-more" aria-hidden="true">
+          <span>看 14 天</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5 15.5 12 9 18.5"/></svg>
+        </span>
+      </span>
+      <span class="trend" id="trendWrap" aria-hidden="true"></span>
+    </button>
+
+    <div class="stats-cols">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>词书掌握度</h3>
+          <p class="muted">一次就记住的比例</p>
+        </div>
+        <ul class="mastery-list" id="bookStats"></ul>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>最需要复习 <span class="pill" id="hardCount">0</span></h3>
+          <p class="muted">按遗忘次数排序</p>
+        </div>
+        <ul class="wordlist" id="hardWords"></ul>
+      </div>
+    </div>
+
+    <div class="panel backup-panel">
+      <div class="panel-head">
+        <h3>数据备份</h3>
+        <p class="muted">把<b>词书库</b>（含导入的表格内容）、<b>勾选状态</b>、<b>背词进度</b>、<b>复习本的单词列表</b>、<b>学习统计的全部记录</b>（含热力图里每天的学习用时）和<b>各项设置</b>（含下面选的发音引擎）打包成一个 JSON 文件。换设备、清浏览器数据之前先导出一份，之后导入就能接着背。导入分「合并」和「覆盖」两种，动手前会让你先确认。</p>
+      </div>
+      <p class="backup-summary" id="backupSummary"></p>
+      <div class="backup-actions">
+        <button class="btn primary" id="btnExport">导出备份</button>
+        <button class="btn ghost" id="btnImportMerge">导入并合并</button>
+        <button class="btn ghost danger" id="btnImportReplace">导入并覆盖</button>
+        <span class="backup-tip muted" id="backupTip">导入前会先让你确认</span>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+
+    <!-- ============ 自定义模块 ============
+         头像 / 用户名称 / 个性签名。数据单独存在 danci.profile.v1，
+         由 assets/profile.js 负责读写（见该文件顶部说明）。 -->
+    <div class="panel profile-panel">
+      <div class="panel-head">
+        <h3>自定义</h3>
+        <p class="muted">换成你自己的头像、名称、签名和主题色。<b>头像</b>可以挑一个现成的字符，也可以上传一张照片（会自动压成 256×256 的方形圆头像）；<b>用户名称</b>和<b>个性签名</b>会显示在词书库页首；<b>主题色</b>会换掉整个界面的强调色，深浅色模式下都跟着变。改动即时保存，只存在本机浏览器里。</p>
+      </div>
+
+      <div class="profile-body">
+        <div class="profile-avatar-col">
+          <div class="avatar-current" id="profileAvatar" aria-hidden="true">词</div>
+          <div class="avatar-acts">
+            <button class="btn ghost tiny" id="btnAvatarPick" type="button">上传照片</button>
+            <button class="btn ghost tiny" id="btnAvatarReset" type="button">恢复默认</button>
+          </div>
+          <input type="file" id="profilePhoto" accept="image/*" hidden>
+          <div class="avatar-presets" id="profilePresets" role="group" aria-label="预设头像">
+            <button class="avatar-preset" type="button" data-ch="词" aria-pressed="true">词</button>
+            <button class="avatar-preset" type="button" data-ch="学" aria-pressed="false">学</button>
+            <button class="avatar-preset" type="button" data-ch="书" aria-pressed="false">书</button>
+            <button class="avatar-preset" type="button" data-ch="拼" aria-pressed="false">拼</button>
+            <button class="avatar-preset" type="button" data-ch="语" aria-pressed="false">语</button>
+            <button class="avatar-preset" type="button" data-ch="星" aria-pressed="false">星</button>
+          </div>
+        </div>
+
+        <div class="profile-fields">
+          <label class="field">
+            <span class="field-label">用户名称</span>
+            <input type="text" id="profileName" maxlength="16" placeholder="你好！" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="field">
+            <span class="field-label">个性签名</span>
+            <input type="text" id="profileSign" maxlength="40" placeholder="你的学习口号是..." autocomplete="off" spellcheck="false">
+          </label>
+          <p class="profile-tip muted" id="profileTip">改动即时保存，只存在本机浏览器里。</p>
+
+          <!-- 主题色：色板由 profile.js 按 THEMES 生成，改的是全站的 M3 主色 -->
+          <div class="theme-field" id="themeField">
+            <span class="field-label">主题色</span>
+            <div class="theme-swatches" id="themeSwatches" role="radiogroup" aria-label="主题色"></div>
+          </div>
+
+          <!-- 外观模式：亮 / 暗 / 跟随系统。
+               这块是 .switch 的滑块复用（不是原生 <input type=range>）——
+               就是同一套轨道 + 圆钮，放大成三个等宽档位。
+               状态靠 JS 给容器加 data-mode 决定，见 profile.js 的 applyScheme()。 -->
+          <div class="theme-field">
+            <span class="field-label" id="schemeLabel">外观模式</span>
+            <div class="mode-slider" id="schemeSlider" data-mode="auto"
+                 role="radiogroup" aria-labelledby="schemeLabel">
+              <!-- 滑块本体：absolute 定位，靠 CSS 的 translateX 在三档间滑动 -->
+              <span class="mode-thumb" aria-hidden="true"></span>
+              <button class="mode-opt" type="button" role="radio" aria-checked="true"
+                      data-scheme="auto">跟随系统</button>
+              <button class="mode-opt" type="button" role="radio" aria-checked="false"
+                      data-scheme="light">亮色</button>
+              <button class="mode-opt" type="button" role="radio" aria-checked="false"
+                      data-scheme="dark">暗色</button>
+            </div>
+          </div>
+
+          <!-- 这里曾有一个「显示状态栏」开关（安卓版专有），现已移除：
+               状态栏改为**始终显示**，由原生侧恒定留出顶部空间。
+               原因见 android/app/src/main/java/com/wordsduck/app/MainActivity.kt
+               里 setUpSystemBars() 的说明 —— 挖孔机上加开关会导致
+               「页面位移」与「不被挖孔挡」二选一，固定下来最省事。 -->
+        </div>
+      </div>
+    </div>
+
+    <div class="panel speak-panel">
+      <div class="panel-head">
+        <h3>发音引擎</h3>
+        <p class="muted">选择单词用哪套声音读出来。<b>网页内置语音</b>是随网页打包的 Piper 神经语音，离线可用，音色固定、不依赖系统；<b>本机内置语音</b>走操作系统自带的朗读功能（安卓手机的 TTS、Windows 的语音包），音色和语速由系统设置决定，手机上通常更自然，但没装语音包或没给权限时可能不出声。选完会记在本机，也会跟着「数据备份」一起导出。</p>
+      </div>
+      <div class="speak-choices" id="speakEngineGroup" role="radiogroup" aria-label="发音引擎">
+        <label class="checkline">
+          <input type="radio" name="speakEngine" value="auto">
+          <span>自动选择<small>先试网页内置语音，还没装载好或不可用时自动改用本机语音</small></span>
+        </label>
+        <label class="checkline">
+          <input type="radio" name="speakEngine" value="local">
+          <span>网页内置语音<small>离线神经语音，读音稳定、每次一致</small></span>
+        </label>
+        <label class="checkline">
+          <input type="radio" name="speakEngine" value="system">
+          <span id="speakSystemLabel">本机内置语音<small>交给系统 TTS 朗读</small></span>
+        </label>
+      </div>
+      <p class="speak-status" id="speakEngineHint"></p>
+      <div class="speak-actions">
+        <button class="btn ghost" id="btnSpeakTest">试听一下</button>
+        <span class="backup-tip muted" id="speakTestTip">用当前选中的引擎读一个词</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 选择工作表 -->
+<div class="modal" id="sheetModal" hidden>
+  <div class="modal-box wide">
+    <button class="modal-close" id="btnSheetClose" aria-label="关闭">×</button>
+    <h2>选择要导入的工作表</h2>
+    <p class="muted" id="sheetModalFile"></p>
+    <div class="sheet-list" id="sheetList"></div>
+    <div class="modal-actions">
+      <label class="checkline"><input type="checkbox" id="sheetAll" checked><span>全选</span></label>
+      <span class="grow"></span>
+      <button class="btn ghost" id="btnSheetCancel">取消</button>
+      <button class="btn primary" id="btnSheetOk">导入所选</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑词书 -->
+<div class="modal" id="editModal" hidden>
+  <div class="modal-box wide">
+    <button class="modal-close" id="btnEditClose" aria-label="关闭">×</button>
+    <h2>编辑词书</h2>
+    <label class="field">
+      <span class="field-label">词书名称</span>
+      <input type="text" id="editName" placeholder="给这本词书起个名字">
+    </label>
+    <p class="muted edit-meta" id="editMeta"></p>
+
+    <div class="field-grid">
+      <label class="field">
+        <span class="field-label">英文列（答案）</span>
+        <select id="editW"></select>
+      </label>
+      <label class="field">
+        <span class="field-label">中文列（题目）</span>
+        <select id="editM"></select>
+      </label>
+      <label class="field">
+        <span class="field-label">词性列（可选提示）</span>
+        <select id="editP"></select>
+      </label>
+      <label class="field">
+        <span class="field-label">例句列（可选）</span>
+        <select id="editE"></select>
+      </label>
+    </div>
+
+    <div class="preview-head" id="cfHead" hidden>
+      <span class="field-label">查重冲突</span>
+      <span class="muted" id="cfCount"></span>
+    </div>
+    <div class="cf-panel" id="cfPanel" hidden>
+      <p class="cf-tip">同一个英文挂着不同的中文意思，或者同一个中文意思挂着不同的英文，背的时候容易混。下面已经按冲突点分好组了，把对不上的那几格改成一致的内容，再点「保存」生效；改回原样或清空都算没动过。</p>
+      <div id="cfList"></div>
+    </div>
+
+    <div class="preview-head">
+      <span class="field-label">内容预览</span>
+      <span class="muted" id="editCount"></span>
+    </div>
+    <div class="preview-wrap">
+      <table class="preview" id="editPreview">
+        <thead><tr><th>#</th><th>中文意思</th><th>英文</th><th>词性</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost danger" id="btnEditDelete">删除这本词书</button>
+      <span class="grow"></span>
+      <button class="btn ghost" id="btnEditCancel">取消</button>
+      <button class="btn primary" id="btnEditSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 使用说明 -->
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-box">
+    <button class="modal-close" id="btnCloseHelp" aria-label="关闭">×</button>
+    <h2>怎么用</h2>
+    <ol class="help-list">
+      <li><b>准备 Excel。</b>第一行写表头，最少两列：英文、中文。词性和例句可选。不确定格式就点「下载模板」。</li>
+      <li><b>导入。</b>把文件拖进来或点「选择文件」。多张工作表会弹框让你勾选，每张成为一本独立词书。导入是<b>累加</b>的，不会覆盖已有词书。</li>
+      <li><b>整理。</b>每行可以调整顺序、编辑、删除。改动列映射或词条后，这本的背词进度会清零（旧进度对不上新词表）。搜索框既能搜词书名，也能直接搜<b>词条</b>。</li>
+      <li><b>查重。</b>同一本里出现<b>同词异义</b>或<b>异词同义</b>时，词书标题旁会亮起「冲突 N」。点「编辑」，在弹窗里把对不上的格子改成一致再保存，标记就会减少直至消失。</li>
+      <li><b>开始背。</b>勾选一本或多本（多本合并成一轮，重复词只留一条），点「开始背词」。卡片只给<b>中文</b>，你先回忆英文，再自己判断记得还是不记得——<b>不记得</b>的词会重新排回本轮，稍后再考一次。</li>
+      <li><b>复习本。</b>一本不用导入的<b>动态词书</b>，自动收录你答「不记得」的词，并按「遗忘次数 × 间隔天数 ÷ 连续记住次数」排出优先级。连着答对两次就算消化，暂时退出；以后再忘又会回来。可以像普通词书一样勾选，也能单独点「开始复习」。</li>
+      <li><b>分批背。</b>词数超过「每本每轮」上限（默认 50）的词书会自动分批，一轮只取这么多。背完在词书库那一行显示进度条，点「<b>继续背</b>」接着背下一批。<b>只有答过「记得」才算过了一遍</b>；整本过完一遍后按钮变成「重背」，才会从头再来。</li>
+      <li><b>看统计。</b>底部「统计」里有打卡天数、通过率、每本词书掌握度、最需要复习的词，以及最近 365 天的热力图。</li>
+      <li><b>备份与迁移。</b>统计页的「数据备份」会把<b>词书库、勾选、背词进度、复习本、学习记录、设置</b>打包成一个 JSON，换设备或清浏览器数据前先导出一份。「导入并合并」是把文件并进现有数据（同一份文件别导两次，学习记录会翻倍）；「导入并覆盖」是用文件替换本机数据——<b>词书库也会被整个替换</b>，本机多出来的词书会消失，动手前建议先导出一份。两种方式都会先让你确认。</li>
+    </ol>
+    <p class="fineprint">所有数据只存在你本机浏览器里，不上传，断网可用。</p>
+  </div>
+</div>
+
+<!-- 语音包装载提示：网页内置语音（Piper）有 127 MB，页面打开后会在后台搬运。
+     搬运期间弹一个居中的提示框，装好自动关闭；装失败也会关掉并说明改用了本机语音。
+     逻辑见 assets/tts-status.js。默认带 hidden，禁用脚本时不会挡住界面。 -->
+<div class="modal tts-modal" id="ttsModal" hidden>
+  <div class="modal-box tts-box" role="status" aria-live="polite">
+    <div class="tts-spinner" aria-hidden="true"></div>
+    <h2 id="ttsTitle">正在装载语音包</h2>
+    <p class="muted" id="ttsSub">网页内置语音是随页面打包的离线音色，第一次打开需要先装进内存。</p>
+    <div class="tts-progress">
+      <span class="tts-bar"><i id="ttsBarFill"></i></span>
+      <span class="tts-count" id="ttsCount">0%</span>
+    </div>
+    <p class="tts-note" id="ttsNote">装载期间可以正常背词，单词先用本机语音朗读。</p>
+  </div>
+</div>
+
+<!-- 最近 14 天趋势（点「最近 7 天」那块打开）
+     内容由 app.js 的 renderTrend() 填进 #trendWrapFull。
+     柱子按天等宽（7 天正好铺满，14 天就溢出），所以 .trend.is-wide
+     外面套一层 overflow-x:auto。溢出时**没有**滑动指示条（已全部去掉），
+     靠内容被切断的观感提示还能往右滑。 -->
+<div class="modal" id="trendModal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="trendModalTitle">
+    <button class="modal-close" id="btnTrendClose" aria-label="关闭">×</button>
+    <h2 id="trendModalTitle">最近 14 天</h2>
+    <p class="muted" id="trendModalSub"></p>
+    <div class="trend-scroll" id="trendModalScroll">
+      <div class="trend is-wide" id="trendWrapFull"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="heatModal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="heatModalTitle">
+    <button class="modal-close" id="btnHeatClose" aria-label="关闭">×</button>
+    <h2 id="heatModalTitle">最近一年</h2>
+    <p class="muted" id="heatModalSub"></p>
+    <div class="heat-scroll heat-scroll-modal">
+      <div class="heat is-wide" id="heatWrapFull"></div>
+    </div>
+    <div class="heat-foot">
+      <span class="muted" id="heatModalRange"></span>
+      <span class="heat-legend">
+        <span class="muted">少</span>
+        <i class="heat-cell lv0"></i><i class="heat-cell lv1"></i><i class="heat-cell lv2"></i><i class="heat-cell lv3"></i><i class="heat-cell lv4"></i>
+        <span class="muted">多</span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="fullTextModal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="fullTextTitle">
+    <button class="modal-close" id="btnFullTextClose" aria-label="关闭">×</button>
+    <h2 id="fullTextTitle">完整内容</h2>
+    <p class="muted" id="fullTextSub"></p>
+    <div class="fulltext-body" id="fullTextBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<div class="heat-tip" id="heatTip" hidden></div>
+
+<!-- Excel 解析库（libs/xlsx.full.min.js，900 多 KB）不在这里同步加载：
+     它是首屏脚本开销的九成以上，却只在「导入文件 / 内置示例词书」时才用得到。
+     assets/app.js 会在真要解析的那一刻把它拉进来。 -->
+<script src="assets/app.js"></script>
+<!-- 导航桥接：把底栏新增的 #btnHome 接到 app.js 已有的钩子上。
+     app.js 是闭合的 IIFE，没有对外暴露 show()，所以新按钮必须在它之后
+     另行接线，否则「从统计页点主页」不会有任何反应。 -->
+<script src="assets/nav-bridge.js"></script>
+<!-- 自定义模块（头像 / 用户名称 / 个性签名）：新功能，读写与渲染都在这里，
+     存在独立的 danci.profile.v1，不碰 app.js 的 settings。 -->
+<script src="assets/profile.js"></script>
+<!-- 网页内置语音包（Piper 神经语音，完全离线，不调系统 TTS）。
+     boot.js 是资源装载器：它把 base64 分块按需拼进内存，再让 tts-local.js 起推理会话。
+     两个脚本都是普通 <script src>，页面的 file:// 环境能直接加载；
+     它们不会阻塞首屏——真正的 90 多 MB 资源在 DOMContentLoaded 之后才开始装，
+     装载期间发音按钮照常走原来的系统 TTS，装好后自动切过来。 -->
+<script src="assets/tts/boot.js"></script>
+<!-- 语音包装载提示：挂在 boot.js 之后、tts-local.js 之前。
+     boot.js 只定义 window.WCTTS（此时还在 idle，还没开始搬资源），
+     所以这里能完整看到「开始装载 → 装好」的全过程。
+     等 tts-local.js 跑完才接的话，装载可能已经启动了，
+     提示框就只能在半途弹出来。 -->
+<script src="assets/tts-status.js"></script>
+<script src="assets/tts-local.js"></script>
+<!-- 涟漪（按下时从指针位置扩散的状态层）：Material Web 的 <md-ripple> 手写还原。
+     事件委托挂在 document 上，所以必须排在所有会产出按钮的脚本之后 ——
+     放在 app.js 后面即可，这里放在最后是为了「装饰层最后加载」，
+     抢不到任何首屏时间。它只做叠加观感，删掉功能不受影响。 -->
+<script src="assets/ripple.js"></script>
+<!-- 自定义下拉：把原生 <select> 的**系统弹出层**换成 M3 菜单。
+     原生下拉的浮层由系统绘制，CSS 够不着，只能用这个办法接管。
+     它保留原生 select 作为状态载体（app.js 照旧读写 .value、监听 change），
+     所以不依赖加载顺序；放在最后是因为它只改观感、不参与首屏逻辑。 -->
+<script src="assets/m3select.js"></script>
+</body>
+</html>

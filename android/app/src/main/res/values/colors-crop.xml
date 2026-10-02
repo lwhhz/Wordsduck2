@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 裁剪界面的窗口底色。与 CropActivity 里 root 的背景色 0xFF121316 一致，
+         这样从启动窗口过渡到内容时不会闪一下别的颜色。 -->
+    <color name="wordsduck_crop_bg">#121316</color>
+</resources>

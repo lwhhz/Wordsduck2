@@ -1,0 +1,78 @@
+{
+ "generatedAt": "2026-09-30T13:03:22.563Z",
+ "mode": "prod",
+ "chunkRaw": 6291456,
+ "voices": [
+  {
+   "id": "gb",
+   "name": "voice_gb",
+   "label": "英音（en_GB-cori-high）",
+   "src": "en_GB-cori-high.onnx"
+  }
+ ],
+ "defaultVoice": "gb",
+ "core": [
+  "ort.wasm.min.js",
+  "piper_phonemize.js",
+  "chunks/ortglue.js",
+  "chunks/ortwasm.00.js",
+  "chunks/ortwasm.01.js",
+  "chunks/phenwasm.00.js",
+  "chunks/phendata.00.js",
+  "voice-config.js"
+ ],
+ "files": [
+  {
+   "file": "ort.wasm.min.js",
+   "bytes": 48327,
+   "sha256_16": "65e09376df69107e",
+   "note": "onnxruntime-web UMD 入口"
+  },
+  {
+   "file": "piper_phonemize.js",
+   "bytes": 111788,
+   "sha256_16": "2dd2f750f2cb5c1d",
+   "note": "espeak-ng glue（已裁剪）"
+  }
+ ],
+ "blobs": [
+  {
+   "name": "ortwasm",
+   "src": "ort-wasm-simd-threaded.wasm",
+   "bytes": 11210254,
+   "parts": 2,
+   "sha256": "71aef04959c5c1b6de461b6538e2058e306610034a85aad2742d0c7fd4533fe4",
+   "note": "onnxruntime-web WASM 后端"
+  },
+  {
+   "name": "phenwasm",
+   "src": "piper_phonemize.wasm",
+   "bytes": 635212,
+   "parts": 1,
+   "sha256": "b777cd107a91d2bcc6a1ea46f2c26a662a7407394fe84589198aeaa83dd7a9d6",
+   "note": "espeak-ng 音素化器"
+  },
+  {
+   "name": "phendata",
+   "src": "piper_phonemize.pruned.data",
+   "bytes": 986700,
+   "parts": 1,
+   "sha256": "f5a874e7133ba0d412ace9fe51f7615ad1d6b2b7018219892117e083cfc2f18a",
+   "note": "espeak-ng 数据包（已裁剪到英文）"
+  },
+  {
+   "name": "voice_gb",
+   "src": "en_GB-cori-high.onnx",
+   "bytes": 114219352,
+   "parts": 19,
+   "sha256": "470b4dd634c98f8a4850d7626ffc3dfc90774628eeef6605a6dd8f88f30a5903",
+   "note": "Piper 英文音色 en_GB-cori-high (fp32)"
+  }
+ ],
+ "totals": {
+  "blobBytes": 127051518,
+  "bootBytes": 127051518,
+  "files": 29,
+  "assetBytes": 127051518
+ }
+}
