@@ -1,5 +1,7 @@
 # Wordsduck2
 
+这是一个纯 Vibe Coding 项目，由DeepSeek-v4、DeepSeek-v4.1大模型，TRAE、DeepSeek Harness平台驱动实现。
+
 [![最新版本](https://img.shields.io/github/v/release/lwhhz/Wordsduck2?label=release)](../../releases/latest)
 
 一个**完全离线**的背单词工具：把 Excel / CSV 词表导进来，按遗忘权重抽词来背。
